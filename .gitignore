@@ -10,3 +10,8 @@ deps/darwin-x86_64/libv8_debug.a
 c.out
 
 /v8go.test
+.idea/inspectionProfiles/Project_Default.xml
+.idea/modules.xml
+.idea/v8go.iml
+.idea/vcs.xml
+.idea/workspace.xml
