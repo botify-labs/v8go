@@ -19,6 +19,10 @@ func (c *Context) Cleanup() {
 // CompileUnboundScript. Go values still referenced from JavaScript are kept
 // until V8 collects them. Any such *Value or *UnboundScript obtained before
 // the call must not be used afterwards.
+//
+// Cleanup also runs the tasks V8 posted for the Isolate (GC tasks such as the
+// memory reducer, FinalizationRegistry callbacks), which nothing else in v8go
+// runs: call it regularly on a long-lived Isolate.
 func (i *Isolate) Cleanup() {
 	if i.ptr == nil {
 		return

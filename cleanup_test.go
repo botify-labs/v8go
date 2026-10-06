@@ -274,3 +274,34 @@ func TestCleanupIsIdempotentAndNilSafe(t *testing.T) {
 	iso.Dispose()
 	iso.Cleanup() // after Dispose: no-op
 }
+
+// V8 posts GC work (memory reducer, GC jobs, ...) and FinalizationRegistry
+// cleanups to the platform's foreground task queue of the isolate.
+// Isolate.Cleanup must run them: v8go never does otherwise, so they piled up
+// in native memory, and the memory reducer never collected old-space garbage
+// on a long-lived isolate (Task 12a soak leak).
+func TestIsolateCleanupRunsPendingPlatformTasks(t *testing.T) {
+	t.Parallel()
+	iso := v8.NewIsolate()
+	defer iso.Dispose()
+	ctx := v8.NewContext(iso)
+	defer ctx.Close()
+
+	const setup = `var cleaned = 0;
+var registry = new FinalizationRegistry(() => { cleaned++; });
+(function () { registry.register({}, 1); })();`
+	if _, err := ctx.RunScript(setup, "registry.js"); err != nil {
+		t.Fatal(err)
+	}
+	iso.LowMemoryNotification() // Collects the target, posts the cleanup task.
+	ctx.Cleanup()
+	iso.Cleanup()
+
+	v, err := ctx.RunScript("cleaned", "check.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Int32() != 1 {
+		t.Fatalf("FinalizationRegistry callback ran %d times after GC and Cleanup, expected 1: Cleanup doesn't run V8's pending platform tasks", v.Int32())
+	}
+}

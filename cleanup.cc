@@ -2,6 +2,9 @@
 
 #include "cleanup.h"
 
+#include <memory>
+
+#include "deps/include/libplatform/libplatform.h"
 #include "deps/include/v8-locker.h"
 
 #include "context.h"
@@ -10,6 +13,22 @@
 #include "value.h"
 
 using namespace v8;
+
+// The platform v8go initializes V8 with, defined in isolate.cc.
+extern std::unique_ptr<Platform> default_platform;
+
+// V8 posts work for an isolate to the platform's foreground task queue: GC
+// tasks (memory reducer, GC jobs, ...) and FinalizationRegistry cleanups.
+// v8go never runs that queue, so the tasks piled up in native memory, and
+// without the memory reducer V8 only ran a major GC at its initial old-space
+// limit. Runs the pending tasks, the expired delayed ones, and the ones they
+// post, without waiting.
+static void RunPendingTasks(Isolate* iso) {
+  Locker locker(iso);
+  Isolate::Scope isolate_scope(iso);
+  while (platform::PumpMessageLoop(default_platform.get(), iso)) {
+  }
+}
 
 void ContextCleanup(ContextPtr ctx) {
   if (ctx == nullptr) {
@@ -43,6 +62,7 @@ void IsolateCleanup(IsolatePtr iso) {
     return;
   }
   ContextCleanup(isolateInternalContext(iso));
+  RunPendingTasks(iso);
 }
 
 int IsolateInternalRetainedValueCount(IsolatePtr iso) {
