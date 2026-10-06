@@ -3,6 +3,16 @@
 # Usage: tools/check_bridge.sh [os_arch ...]   (default: all deps/*_*)
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
+
+# cleanup.cc declares tommie's platform global as
+# `extern std::unique_ptr<Platform> default_platform;`: a renamed global fails
+# to link, but a changed type would compile into undefined behaviour.
+if ! grep -qxF 'auto default_platform = platform::NewDefaultPlatform();' isolate.cc; then
+  echo "isolate.cc no longer defines 'auto default_platform = platform::NewDefaultPlatform();'," \
+    "which cleanup.cc (RunPendingTasks) relies on: update its extern declaration" >&2
+  exit 1
+fi
+
 want=$(tools/bridge_hash.sh)
 targets=("$@")
 [ ${#targets[@]} -gt 0 ] || targets=($(cd deps && ls -d *_*/ | tr -d /))

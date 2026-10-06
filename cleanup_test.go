@@ -305,3 +305,52 @@ var registry = new FinalizationRegistry(() => { cleaned++; });
 		t.Fatalf("FinalizationRegistry callback ran %d times after GC and Cleanup, expected 1: Cleanup doesn't run V8's pending platform tasks", v.Int32())
 	}
 }
+
+// Tasks pumped by Isolate.Cleanup can run JS that calls Go callbacks. Those
+// may return the Isolate's cached Undefined/Null, which must still be valid
+// then: Cleanup runs the tasks before it releases the internal values.
+func TestIsolateCleanupTaskCallbacksCanReturnUndefinedAndNull(t *testing.T) {
+	t.Parallel()
+	iso := v8.NewIsolate()
+	defer iso.Dispose()
+
+	calls := 0
+	global := v8.NewObjectTemplate(iso)
+	if err := global.Set("goUndefined", v8.NewFunctionTemplate(iso, func(*v8.FunctionCallbackInfo) *v8.Value {
+		calls++
+		return v8.Undefined(iso)
+	})); err != nil {
+		t.Fatal(err)
+	}
+	if err := global.Set("goNull", v8.NewFunctionTemplate(iso, func(*v8.FunctionCallbackInfo) *v8.Value {
+		calls++
+		return v8.Null(iso)
+	})); err != nil {
+		t.Fatal(err)
+	}
+	ctx := v8.NewContext(iso, global)
+	defer ctx.Close()
+
+	const setup = `var u = 0, n = 0;
+var registry = new FinalizationRegistry(() => { u = goUndefined(); n = goNull(); });
+(function () { registry.register({}, 1); })();`
+	if _, err := ctx.RunScript(setup, "registry.js"); err != nil {
+		t.Fatal(err)
+	}
+	iso.LowMemoryNotification() // Collects the target, posts the cleanup task.
+	iso.Cleanup()               // Runs the task: the callbacks return Undefined/Null.
+
+	if calls != 2 {
+		t.Fatalf("expected 2 Go callback calls during Cleanup, got %d", calls)
+	}
+	v, err := ctx.RunScript("u === undefined && n === null", "check.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !v.Boolean() {
+		t.Fatal("callbacks run during Cleanup returned a released Undefined/Null")
+	}
+	if !v8.Undefined(iso).IsUndefined() || !v8.Null(iso).IsNull() {
+		t.Fatal("Undefined/Null unusable after Cleanup")
+	}
+}

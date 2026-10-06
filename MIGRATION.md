@@ -44,13 +44,21 @@ Pour gojs, c'est le seul changement : l'import. Le reste du code n'a pas bougé.
 
 - `Isolate.Cleanup()` et `Context.Cleanup()` gardent la même API. Les valeurs Go encore
   référencées par JS sont désormais conservées jusqu'à leur collecte par V8.
-  `Isolate.Cleanup()` exécute aussi les tâches que V8 a postées pour l'isolate (GC : memory
-  reducer, etc. ; callbacks `FinalizationRegistry`), que v8go n'exécute nulle part ailleurs : sans
-  cela, un isolate long-lived accumulait ces tâches et ne lançait un GC majeur qu'à sa limite
-  initiale (fuite du soak, Task 12a).
 - Intl/ICU est disponible (ICU 78 interne à V8, indépendante de l'ICU 65 de liburlnorm).
 - `FunctionCallback` et `NewFunctionTemplate` sont inchangés : les callbacks existants compilent
   tels quels. Aucun test de la baseline n'a été supprimé.
+
+## 3bis. Comportements modifiés
+
+- `Isolate.Cleanup()` exécute d'abord les tâches que V8 a postées pour l'isolate (GC : memory
+  reducer, etc. ; callbacks `FinalizationRegistry`), que v8go n'exécute nulle part ailleurs. Sans
+  cela, un isolate long-lived accumulait ces tâches en mémoire native et ne lançait un GC majeur
+  qu'à sa limite initiale (fuite du soak, Task 12a). Conséquences :
+  - du JS, et les callbacks Go qu'il appelle, peuvent s'exécuter pendant `Cleanup()` ;
+  - ne pas appeler `Cleanup()` depuis un `FunctionCallback` ni pendant que du JS s'exécute ;
+  - re-récupérer `Undefined(iso)` / `Null(iso)` après `Cleanup()` ;
+  - un `TerminateExecution` (watchdog) ou le callback de limite de heap peut prendre effet pendant
+    `Cleanup()` et affecter le `RunScript` suivant.
 
 ## 4. Changements d'API
 

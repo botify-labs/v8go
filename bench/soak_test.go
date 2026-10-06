@@ -47,6 +47,11 @@ func soakIterations() int {
 
 // One long-lived isolate/context, reused like gojs does: run scripts, call Go
 // from JS, wrap Go values, compile from a code cache, then Cleanup.
+//
+// With the new V8, RSS only plateaus because Isolate.Cleanup runs V8's memory
+// reducer, a timer task (>= 8 s): the run must last long enough for it to fire
+// (100k iterations take ~20 s). Without it, V8's first major GC comes only
+// after ~170k iterations.
 func TestSoakCleanup(t *testing.T) {
 	iters := soakIterations()
 	iso := NewIsolate()

@@ -6,7 +6,9 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
 - **Bridge précompilé** : les `.cc` ne sont compilés qu'avec `-tags v8go_source`. Les consommateurs
   lient `deps/<os>_<arch>/libv8go.a` (`v8go.lib` sous Windows), produit par `tools/build_bridge.sh`.
   `tools/check_bridge.sh` vérifie qu'il correspond aux sources.
-- `cleanup.*` : `Isolate.Cleanup()` / `Context.Cleanup()`.
+- `cleanup.*` : `Isolate.Cleanup()` / `Context.Cleanup()`. `Isolate.Cleanup()` exécute les tâches
+  V8 de l'isolate ; le soak (`bench/soak_test.go`) ne passe que grâce au timer du memory reducer de
+  V8 (≥ 8 s) : le soak de 100k itérations doit durer assez longtemps (~20 s) pour qu'il se déclenche.
 - `bench/` : comparaison avec `v0.6.0-botify-baseline` (V8 9.0). `tools/docker/` : environnement de dev.
 
 Mettre à jour V8 :
