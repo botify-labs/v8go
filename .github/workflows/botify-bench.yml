@@ -16,6 +16,10 @@ jobs:
       matrix:
         platform: [macos-15, macos-15-intel]
     runs-on: ${{ matrix.platform }}
+    defaults:
+      run:
+        # bash runs with pipefail, so a failing `go test | tee` fails the step.
+        shell: bash
     steps:
     - uses: actions/checkout@v7
       with:
