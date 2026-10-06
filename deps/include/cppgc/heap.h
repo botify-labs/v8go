@@ -5,6 +5,8 @@
 #ifndef INCLUDE_CPPGC_HEAP_H_
 #define INCLUDE_CPPGC_HEAP_H_
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -19,6 +21,7 @@
 namespace cppgc {
 
 class AllocationHandle;
+class HeapHandle;
 
 /**
  * Implementation details of cppgc. Those details are considered internal and
@@ -30,9 +33,16 @@ class Heap;
 }  // namespace internal
 
 /**
- * Used for additional heap APIs.
+ * A marker that captures the current stack start address.
  */
-class HeapHandle;
+class V8_EXPORT StackStartMarker {
+ public:
+  StackStartMarker() : stack_start_(__builtin_frame_address(0)) {}
+  void* stack_start() const { return stack_start_; }
+
+ private:
+  void* stack_start_;
+};
 
 class V8_EXPORT Heap {
  public:
@@ -57,7 +67,7 @@ class V8_EXPORT Heap {
   };
 
   /**
-   * Specifies supported marking types
+   * Specifies supported marking types.
    */
   enum class MarkingType : uint8_t {
     /**
@@ -66,8 +76,8 @@ class V8_EXPORT Heap {
      */
     kAtomic,
     /**
-     * Incremental marking, i.e. interleave marking is the rest of the
-     * application on the same thread.
+     * Incremental marking interleaves marking with the rest of the application
+     * workload on the same thread.
      */
     kIncremental,
     /**
@@ -77,13 +87,18 @@ class V8_EXPORT Heap {
   };
 
   /**
-   * Specifies supported sweeping types
+   * Specifies supported sweeping types.
    */
   enum class SweepingType : uint8_t {
     /**
      * Atomic stop-the-world sweeping. All of sweeping is performed at once.
      */
     kAtomic,
+    /**
+     * Incremental sweeping interleaves sweeping with the rest of the
+     * application workload on the same thread.
+     */
+    kIncremental,
     /**
      * Incremental and concurrent sweeping. Sweeping is split and interleaved
      * with the rest of the application.
@@ -148,8 +163,13 @@ class V8_EXPORT Heap {
      * GC scheduler follows.
      */
     ResourceConstraints resource_constraints;
-  };
 
+    /**
+     * Optional marker representing the stack start of the thread creating the
+     * heap.
+     */
+    std::optional<StackStartMarker> stack_start_marker = std::nullopt;
+  };
   /**
    * Creates a new heap that can be used for object allocation.
    *

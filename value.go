@@ -5,13 +5,15 @@
 package v8go
 
 // #include <stdlib.h>
-// #include "v8go.h"
+// #include "value.h"
 import "C"
 import (
 	"errors"
 	"fmt"
 	"io"
 	"math/big"
+	"reflect"
+	"runtime/cgo"
 	"unsafe"
 )
 
@@ -54,14 +56,27 @@ func Null(iso *Isolate) *Value {
 }
 
 // NewValue will create a primitive value. Supported values types to create are:
-//   string -> V8::String
-//   int32 -> V8::Integer
-//   uint32 -> V8::Integer
-//   bool -> V8::Boolean
-//   int64 -> V8::BigInt
-//   uint64 -> V8::BigInt
-//   bool -> V8::Boolean
-//   *big.Int -> V8::BigInt
+//
+//	string -> V8::String
+//	int32 -> V8::Integer
+//	uint32 -> V8::Integer
+//	int64 -> V8::BigInt
+//	uint64 -> V8::BigInt
+//	bool -> V8::Boolean
+//	*big.Int -> V8::BigInt
+//
+// Other pointers are wrapped in a V8::External. JavaScript sees an opaque
+// object, which can e.g. be stored in an internal field with
+// [Object.SetInternalField], or passed to a function. The Go value is read
+// back with [Value.External]. Other types are not supported: a slice or map
+// was probably meant to be converted, and a struct would be copied.
+//
+// Each call creates a new External, so wrapping the same pointer twice gives
+// two values that are not equal in JavaScript.
+//
+// V8 keeps the Go value until the External is garbage collected, or the
+// Isolate is disposed. The returned Value keeps the External alive until it
+// is released, like any other Value.
 func NewValue(iso *Isolate, val interface{}) (*Value, error) {
 	if iso == nil {
 		return nil, errors.New("v8go: failed to create new Value: Isolate cannot be <nil>")
@@ -73,7 +88,7 @@ func NewValue(iso *Isolate, val interface{}) (*Value, error) {
 	case string:
 		cstr := C.CString(v)
 		defer C.free(unsafe.Pointer(cstr))
-		rtn := C.NewValueString(iso.ptr, cstr)
+		rtn := C.NewValueString(iso.ptr, cstr, C.int(len(v)))
 		return valueResult(nil, rtn)
 	case int32:
 		rtnVal = &Value{
@@ -132,11 +147,37 @@ func NewValue(iso *Isolate, val interface{}) (*Value, error) {
 
 		rtn := C.NewValueBigIntFromWords(iso.ptr, C.int(sign), C.int(count), &words[0])
 		return valueResult(nil, rtn)
-	default:
+	case Valuer:
+		// Wrapping a Value in an External is almost certainly a mistake.
 		return nil, fmt.Errorf("v8go: unsupported value type `%T`", v)
+	default:
+		if reflect.ValueOf(v).Kind() != reflect.Pointer {
+			return nil, fmt.Errorf("v8go: unsupported value type `%T`", v)
+		}
+		rtnVal = &Value{
+			ptr: C.NewValueGo(iso.ptr, C.uintptr_t(cgo.NewHandle(v))),
+		}
 	}
 
 	return rtnVal, nil
+}
+
+// External returns the Go value wrapped by [NewValue]. It returns false if
+// the value is not an External.
+func (v *Value) External() (any, bool) {
+	h := cgo.Handle(C.ValueToGo(v.ptr))
+	if h == 0 {
+		return nil, false
+	}
+	return h.Value(), true
+}
+
+// goDeleteHandle is called from C++ when V8 has collected an External
+// created by NewValue, or the Isolate is disposed.
+//
+//export goDeleteHandle
+func goDeleteHandle(h C.uintptr_t) {
+	cgo.Handle(h).Delete()
 }
 
 // Format implements the fmt.Formatter interface to provide a custom formatter
@@ -199,13 +240,12 @@ func (v *Value) Boolean() bool {
 // DetailString provide a string representation of this value usable for debugging.
 func (v *Value) DetailString() string {
 	rtn := C.ValueToDetailString(v.ptr)
-	if rtn.string == nil {
+	if rtn.data == nil {
 		err := newJSError(rtn.error)
 		panic(err) // TODO: Return a fallback value
 	}
-	s := rtn.string
-	defer C.free(unsafe.Pointer(s))
-	return C.GoString(s)
+	defer C.free(unsafe.Pointer(rtn.data))
+	return C.GoStringN(rtn.data, rtn.length)
 }
 
 // Int32 perform the equivalent of `Number(value)` in JS and convert the result to a
@@ -242,8 +282,8 @@ func (v *Value) Object() *Object {
 // print their definition.
 func (v *Value) String() string {
 	s := C.ValueToString(v.ptr)
-	defer C.free(unsafe.Pointer(s))
-	return C.GoString(s)
+	defer C.RtnStringRelease(s)
+	return C.GoStringN(s.data, C.int(s.length))
 }
 
 // Uint32 perform the equivalent of `Number(value)` in JS and convert the result to an
@@ -338,8 +378,7 @@ func (v *Value) IsNumber() bool {
 
 // IsExternal returns true if this value is an `External` object.
 func (v *Value) IsExternal() bool {
-	// TODO(rogchap): requires test case
-	return v.ctx != nil && C.ValueIsExternal(v.ptr) != 0
+	return C.ValueIsExternal(v.ptr) != 0
 }
 
 // IsInt32 returns true if this value is a 32-bit signed integer.
@@ -533,6 +572,11 @@ func (v *Value) IsProxy() bool {
 	return C.ValueIsProxy(v.ptr) != 0
 }
 
+// Release this value.  Using the value after calling this function will result in undefined behavior.
+func (v *Value) Release() {
+	C.ValueRelease(v.ptr)
+}
+
 // IsWasmModuleObject returns true if this value is a `WasmModuleObject`.
 func (v *Value) IsWasmModuleObject() bool {
 	// TODO(rogchap): requires test case
@@ -555,11 +599,27 @@ func (v *Value) AsObject() (*Object, error) {
 	return &Object{v}, nil
 }
 
+// AsSymbol will cast the value to the Symbol type. If the value is not a Symbol
+// then an error is returned.
+func (v *Value) AsSymbol() (*Symbol, error) {
+	if !v.IsSymbol() {
+		return nil, errors.New("v8go: value is not a Symbol")
+	}
+	return &Symbol{v}, nil
+}
+
 func (v *Value) AsPromise() (*Promise, error) {
 	if !v.IsPromise() {
 		return nil, errors.New("v8go: value is not a Promise")
 	}
 	return &Promise{&Object{v}}, nil
+}
+
+func (v *Value) AsException() (*Exception, error) {
+	if !v.IsNativeError() {
+		return nil, errors.New("v8go: value is not an Error")
+	}
+	return &Exception{v}, nil
 }
 
 func (v *Value) AsFunction() (*Function, error) {
@@ -576,4 +636,31 @@ func (v *Value) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return []byte(jsonStr), nil
+}
+
+func (v *Value) SharedArrayBufferGetContents() ([]byte, func(), error) {
+	if !v.IsSharedArrayBuffer() {
+		return nil, nil, errors.New("v8go: value is not a SharedArrayBuffer")
+	}
+
+	backingStore := C.SharedArrayBufferGetBackingStore(v.ptr)
+	release := func() {
+		C.BackingStoreRelease(backingStore)
+	}
+
+	byte_ptr := (*byte)(unsafe.Pointer(C.BackingStoreData(backingStore)))
+	byte_size := C.BackingStoreByteLength(backingStore)
+	byte_slice := unsafe.Slice(byte_ptr, byte_size)
+
+	return byte_slice, release, nil
+}
+
+func (v *Value) StrictEquals(other *Value) bool {
+	return C.ValueStrictEquals(v.ptr, other.ptr) != 0
+}
+
+func (v *Value) TypeOf() string {
+	s := C.ValueTypeOf(v.ptr)
+	defer C.RtnStringRelease(s)
+	return C.GoStringN(s.data, C.int(s.length))
 }
