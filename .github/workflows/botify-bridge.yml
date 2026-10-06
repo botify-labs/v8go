@@ -4,6 +4,12 @@ name: Botify Bridge
 # branch the workflow runs on. Run it after a tommie sync or a C++ change.
 on:
   workflow_dispatch:
+  # GitHub only dispatches workflows that exist on the default branch, or that
+  # have already run once. Until upgrade-v8 is merged, a change to this file
+  # on that branch runs it (the bot commit doesn't trigger workflows).
+  push:
+    branches: [upgrade-v8]
+    paths: [.github/workflows/botify-bridge.yml]
 
 jobs:
   build:
