@@ -1,4 +1,6 @@
+// clang-format off
 //go:build v8go_source
+// clang-format on
 
 #include "_cgo_export.h"
 

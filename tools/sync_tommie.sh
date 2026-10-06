@@ -37,8 +37,15 @@ go mod edit \
   -droprequire=github.com/botify-labs/v8go/deps/android_amd64 \
   -droprequire=github.com/botify-labs/v8go/deps/android_arm64
 
+# The tag sits between clang-format off/on markers: clang-format would rewrite
+# a bare first-line `//go:build` into `// go:build`, which silently drops the
+# constraint. Go accepts build constraints preceded by other line comments.
+# Idempotent; also upgrades files that only carry the bare single line.
+HDR=$'// clang-format off\n//go:build v8go_source\n// clang-format on'
 for src in *.cc; do
-  grep -q '^//go:build v8go_source' "$src" || sed -i '1i //go:build v8go_source\n' "$src"
+  [ "$(sed -n 1,3p "$src")" = "$HDR" ] && continue
+  sed -i '1{/^\/\/ \?go:build v8go_source$/{N;/\n$/d}}' "$src"
+  sed -i '1i // clang-format off\n//go:build v8go_source\n// clang-format on\n' "$src"
 done
 for f in deps/*_*/cgo.go; do
   grep -q -- '-lv8go' "$f" ||

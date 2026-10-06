@@ -61,7 +61,7 @@ Statut : en revue (révision 2 : livraison 100 % statique avec bridge précompil
 
 - Branche `upgrade-v8`, créée depuis `master`. `tools/sync_tommie.sh <sha>` importe l'instantané,
   renomme le module, retire android et les workflows de build V8 de tommie, puis :
-  - ajoute `//go:build v8go_source` en tête de chaque `.cc` importé ;
+  - ajoute `//go:build v8go_source` en tête de chaque `.cc` importé, entre `// clang-format off` et `// clang-format on` (clang-format réécrit sinon le tag en `// go:build`) ;
   - ajoute aux `deps/*/cgo.go` les lignes `#cgo !v8go_source LDFLAGS: -lv8go`
     (et `-lm` sous linux, car gcc ne lie pas libm d'office).
 - Les fichiers Botify (listés dans `tools/botify-owned.txt`) sont préservés.

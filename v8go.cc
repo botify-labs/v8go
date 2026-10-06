@@ -1,4 +1,6 @@
+// clang-format off
 //go:build v8go_source
+// clang-format on
 
 // Copyright 2019 Roger Chapman and the v8go contributors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be

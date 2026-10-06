@@ -1,4 +1,6 @@
+// clang-format off
 //go:build v8go_source
+// clang-format on
 
 #include "deps/include/v8-context.h"
 #include "deps/include/v8-initialization.h"
