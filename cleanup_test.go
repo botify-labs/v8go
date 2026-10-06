@@ -130,7 +130,14 @@ func TestIsolateCleanupReleasesUnboundScripts(t *testing.T) {
 	}
 }
 
-type cleanupPayload struct{ n int }
+// cleanupPayload holds a pointer so that it isn't a tiny allocation: Go packs
+// pointer-free objects under 16 bytes into shared 16-byte blocks, and a
+// finalizer only runs once the whole block is unreachable, so it may never
+// run while another goroutine's object in the block is live.
+type cleanupPayload struct {
+	n int
+	_ *int
+}
 
 func TestIsolateCleanupKeepsGoValueReferencedByJS(t *testing.T) {
 	t.Parallel()
