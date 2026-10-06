@@ -50,8 +50,9 @@ replace rogchap.com/v8go => /src/v8go-baseline
 EOF
     ;;
   new)
-    # The replaces cover unpublished versions: gojs requires a placeholder
-    # v8go version, and v8go requires deps/* pseudo-versions not pushed yet.
+    # Unversioned replaces: local runs use this v8go checkout and its deps
+    # modules whatever version gojs pins. v8go is not also listed in `use`:
+    # Go rejects a go.work that replaces a workspace module at all versions.
     cat >/tmp/gojs.work <<'EOF'
 go 1.27
 
@@ -59,16 +60,14 @@ use (
 	/src/cdf-gojs-upgrade/gojs
 	/src/cdf-gojs-upgrade/go/pkg
 	/src/cdf-gojs-upgrade/liburlnorm/go/urlnorm
-	/src/v8go
-	/src/v8go/deps/linux_amd64
 )
 
-replace github.com/botify-labs/v8go v0.0.0-00010101000000-000000000000 => /src/v8go
-replace github.com/botify-labs/v8go/deps/darwin_amd64 v0.0.0-20261002113538-9bab41ffd41a => /src/v8go/deps/darwin_amd64
-replace github.com/botify-labs/v8go/deps/darwin_arm64 v0.0.0-20261002113538-9bab41ffd41a => /src/v8go/deps/darwin_arm64
-replace github.com/botify-labs/v8go/deps/linux_amd64 v0.0.0-20261002113538-9bab41ffd41a => /src/v8go/deps/linux_amd64
-replace github.com/botify-labs/v8go/deps/linux_arm64 v0.0.0-20261002113538-9bab41ffd41a => /src/v8go/deps/linux_arm64
-replace github.com/botify-labs/v8go/deps/windows_amd64 v0.0.0-20261002113538-9bab41ffd41a => /src/v8go/deps/windows_amd64
+replace github.com/botify-labs/v8go => /src/v8go
+replace github.com/botify-labs/v8go/deps/darwin_amd64 => /src/v8go/deps/darwin_amd64
+replace github.com/botify-labs/v8go/deps/darwin_arm64 => /src/v8go/deps/darwin_arm64
+replace github.com/botify-labs/v8go/deps/linux_amd64 => /src/v8go/deps/linux_amd64
+replace github.com/botify-labs/v8go/deps/linux_arm64 => /src/v8go/deps/linux_arm64
+replace github.com/botify-labs/v8go/deps/windows_amd64 => /src/v8go/deps/windows_amd64
 EOF
     ;;
   *) echo "usage: gojs_work baseline|new" >&2; return 1 ;;
