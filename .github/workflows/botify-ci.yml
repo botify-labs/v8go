@@ -44,19 +44,46 @@ jobs:
       run: tools/build_bridge.sh
     - name: Consumer-mode tests (prebuilt bridge, system compiler, no flags)
       run: CC="${{ matrix.consumer_cc }}" CGO_CXXFLAGS= go test ${{ matrix.race }} -count=1 ./...
-    - name: glibc floor of a consumer binary (at most GLIBC_2.34)
-      if: matrix.os == 'linux' && matrix.arch == 'amd64'
+    - name: Source-mode tests
+      run: go test -tags v8go_source -count=1 ./...
+      env:
+        CGO_CXXFLAGS: "-nostdinc++"
+
+  glibc-floor:
+    # Our oldest Linux runtime is Amazon Linux 2023 (glibc 2.34). The linker
+    # binds the archives' unversioned libc/libm references to the build host's
+    # default versions (on ubuntu-24.04, fmod@GLIBC_2.38), so the consumer
+    # binary is built, checked and run on AL2023 itself.
+    name: Consumer build and tests on Amazon Linux 2023 (at most GLIBC_2.34)
+    runs-on: ubuntu-24.04
+    container: amazonlinux:2023
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOFLAGS: -buildvcs=false
+    steps:
+    - name: Install gcc, binutils, git and Go 1.27
       run: |
-        CC="${{ matrix.consumer_cc }}" CGO_CXXFLAGS= go test -c -o v8go.test .
+        dnf install -y -q gcc binutils git tar gzip
+        curl -fsSL 'https://go.dev/dl/?mode=json&include=all' -o "$RUNNER_TEMP/go.json"
+        ver=$(grep -oE '"go1\.27\.[0-9]+"' "$RUNNER_TEMP/go.json" | tr -d '"' | sort -Vu | tail -1)
+        [ -n "$ver" ] || { echo "no go1.27.x release found" >&2; exit 1; }
+        curl -fsSL "https://go.dev/dl/$ver.linux-amd64.tar.gz" | tar -C /usr/local -xz
+        echo /usr/local/go/bin >>"$GITHUB_PATH"
+    - uses: actions/checkout@v7
+    - run: go version && go work init . ./deps/linux_amd64
+    - name: Build the consumer test binary (prebuilt bridge, gcc, no flags)
+      run: CC=gcc CGO_CXXFLAGS= go test -c -o v8go.test .
+    - name: glibc floor (at most GLIBC_2.34)
+      run: |
         max=$(objdump -T v8go.test | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1)
         echo "highest glibc symbol version: ${max:-none}"
         [ -n "$max" ] || { echo "no GLIBC_ symbol found: is v8go.test a dynamic binary?" >&2; exit 1; }
         top=$(printf '%s\nGLIBC_2.34\n' "$max" | sort -V | tail -1)
         [ "$top" = GLIBC_2.34 ] || { echo "v8go.test needs $max, newer than GLIBC_2.34" >&2; exit 1; }
-    - name: Source-mode tests
-      run: go test -tags v8go_source -count=1 ./...
-      env:
-        CGO_CXXFLAGS: "-nostdinc++"
+    - name: Run the tests on AL2023
+      run: ./v8go.test -test.count=1
 
   leakcheck:
     name: LeakSanitizer (source mode)
