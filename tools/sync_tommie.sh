@@ -14,10 +14,11 @@ SRC=$(mktemp -d)
 trap 'rm -rf "$SRC"' EXIT
 
 git -C "$SRC" init -q
-git -C "$SRC" remote add origin https://github.com/botify-labs/v8go.git
+git -C "$SRC" remote add origin https://github.com/tommie/v8go.git
 git -C "$SRC" sparse-checkout set --no-cone '/*' '!/deps/android_*/' '!/cgo_android_*.go'
 git -C "$SRC" fetch -q --depth=1 --filter=blob:none origin "$SHA"
 git -C "$SRC" checkout -q FETCH_HEAD
+EXEC=$(cd "$SRC" && find . -type f -perm -u+x ! -path './.git/*' | sed 's#^\./##')
 rm -rf "$SRC/.git"
 
 rsync -a --delete --exclude-from="$ROOT/tools/botify-owned.txt" "$SRC/" "$ROOT/"
@@ -27,9 +28,9 @@ rm -rf .gitmodules deps/v8 deps/depot_tools \
   .github/workflows/v8upgrade.yml .github/workflows/v8build.yml .github/workflows/release.yml
 git rm -q -r --cached --ignore-unmatch deps/v8 deps/depot_tools >/dev/null
 
-grep -rlZ -e 'github.com/botify-labs/v8go' \
+grep -rlZ -e 'github.com/tommie/v8go' \
   --include='*.go' --include='go.mod' --include='*.py' --include='*.sh' \
-  --exclude-dir=.git --exclude-dir=bench --exclude-dir=docs . |
+  --exclude-dir=.git --exclude-dir=bench --exclude-dir=docs --exclude=sync_tommie.sh . |
   xargs -0 -r sed -i 's#github\.com/tommie/v8go#github.com/botify-labs/v8go#g'
 
 go mod edit \
@@ -43,6 +44,8 @@ for f in deps/*_*/cgo.go; do
   grep -q -- '-lv8go' "$f" ||
     sed -i '/^\/\/ #cgo LDFLAGS: -L\${SRCDIR}$/a // #cgo !v8go_source LDFLAGS: -lv8go\n// #cgo linux,!v8go_source LDFLAGS: -lm' "$f"
 done
+
+[ -z "$EXEC" ] || { echo "$EXEC" | xargs git add -- && echo "$EXEC" | xargs git update-index --chmod=+x --; }
 
 echo "$SHA" >deps/tommie_sha
 echo "Imported tommie/v8go@$SHA (V8 $(cat deps/v8_hash))"
