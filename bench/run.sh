@@ -80,7 +80,9 @@ restore_baseline() {
 trap restore_baseline EXIT
 if want gojs || want soak; then
   if grep -q 'dop251/goja' "$BASE/gojs/go.mod"; then
-    echo "$BASE/gojs/go.mod already requires goja (left over?): restore it with git checkout first" >&2
+    echo "$BASE/gojs/go.mod already requires goja (left over?): restore it first with git checkout," \
+      "run on the host, not in the container (the worktree's .git file holds a Windows path):" \
+      "git -C D:/botify/cdf-gojs-baseline checkout gojs/go.mod gojs/go.sum" >&2
     exit 1
   fi
   cp "$BASE/gojs/go.mod" "$BASE/gojs/go.sum" "$SAVED/"
@@ -126,28 +128,37 @@ if want gojs; then
 fi
 
 soak_failed=
+soak_errors=
+# soak_status <name> <log>: after a failed soak pipeline, tells a soak FAIL (a
+# result: "--- FAIL" in the log) from a build or install error.
+soak_status() {
+  if grep -q -- '--- FAIL' "$2"; then
+    soak_failed+=" $1"
+  else
+    soak_errors+=" $1"
+  fi
+}
 if want soak; then
-  # A soak FAIL is a result: record it and run the remaining soaks.
+  # A soak FAIL or error is recorded, and the remaining soaks still run.
   echo "== soak"
   cd /src/v8go/bench
   use_baseline
-  SOAK_OUT="$OUT/soak-v8go-baseline.csv" GOWORK=off go test -tags 'soak v8baseline' -run TestSoakCleanup -v -count 1 -timeout 4h . |
-    tee "$OUT/soak-v8go-baseline.txt" || soak_failed+=" v8go-baseline"
+  SOAK_OUT="$OUT/soak-v8go-baseline.csv" GOWORK=off go test -tags 'soak v8baseline' -run TestSoakCleanup -v -count 1 -timeout 4h . 2>&1 |
+    tee "$OUT/soak-v8go-baseline.txt" || soak_status v8go-baseline "$OUT/soak-v8go-baseline.txt"
   use_consumer
-  SOAK_OUT="$OUT/soak-v8go-new.csv" GOWORK=off go test -tags soak -run TestSoakCleanup -v -count 1 -timeout 4h . |
-    tee "$OUT/soak-v8go-new.txt" || soak_failed+=" v8go-new"
+  SOAK_OUT="$OUT/soak-v8go-new.csv" GOWORK=off go test -tags soak -run TestSoakCleanup -v -count 1 -timeout 4h . 2>&1 |
+    tee "$OUT/soak-v8go-new.txt" || soak_status v8go-new "$OUT/soak-v8go-new.txt"
   use_baseline
   gojs_work baseline
-  baseline_gojs env SOAK_OUT="$OUT/soak-gojs-baseline.csv" go test -tags soak -run TestSoakV8Cleanup -v -count 1 -timeout 4h . |
-    tee "$OUT/soak-gojs-baseline.txt" || soak_failed+=" gojs-baseline"
+  baseline_gojs env SOAK_OUT="$OUT/soak-gojs-baseline.csv" go test -tags soak -run TestSoakV8Cleanup -v -count 1 -timeout 4h . 2>&1 |
+    tee "$OUT/soak-gojs-baseline.txt" || soak_status gojs-baseline "$OUT/soak-gojs-baseline.txt"
   use_consumer
   gojs_work new
-  (cd "$UPGRADE/gojs" && SOAK_OUT="$OUT/soak-gojs-new.csv" go test -tags soak -run TestSoakV8Cleanup -v -count 1 -timeout 4h .) |
-    tee "$OUT/soak-gojs-new.txt" || soak_failed+=" gojs-new"
+  (cd "$UPGRADE/gojs" && SOAK_OUT="$OUT/soak-gojs-new.csv" go test -tags soak -run TestSoakV8Cleanup -v -count 1 -timeout 4h .) 2>&1 |
+    tee "$OUT/soak-gojs-new.txt" || soak_status gojs-new "$OUT/soak-gojs-new.txt"
 fi
 
 echo "Results in $OUT"
-if [[ -n $soak_failed ]]; then
-  echo "Soak FAIL:$soak_failed" >&2
-  exit 1
-fi
+[[ -z $soak_failed ]] || echo "Soak FAIL:$soak_failed" >&2
+[[ -z $soak_errors ]] || echo "Soak not run (build or install error, see the soak-*.txt logs):$soak_errors" >&2
+[[ -z $soak_failed$soak_errors ]] || exit 1

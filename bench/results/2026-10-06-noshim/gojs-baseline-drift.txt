@@ -1,0 +1,56 @@
+goos: linux
+goarch: amd64
+pkg: github.com/botify-hq/cdf/gojs
+cpu: Intel(R) Core(TM) Ultra 9 285H
+                                │    task14    │               task24               │
+                                │    sec/op    │   sec/op     vs base               │
+V8_Cleanup/QuerySelectors-16      149.2µ ±  1%   140.9µ ± 2%  -5.53% (p=0.000 n=10)
+V8_Cleanup/ReadAttributes-16      151.3µ ±  3%   139.2µ ± 2%  -8.00% (p=0.000 n=10)
+V8_Cleanup/WriteAttributes-16     159.3µ ±  4%   149.8µ ± 2%  -5.95% (p=0.000 n=10)
+V8_Cleanup/DomMutation-16         167.4µ ±  8%   155.3µ ± 2%  -7.24% (p=0.000 n=10)
+V8_Cleanup/TreeNavigation-16      251.9µ ±  3%   232.8µ ± 1%  -7.59% (p=0.000 n=10)
+V8_Cleanup/MixedRealistic-16      271.5µ ±  7%   250.9µ ± 2%  -7.59% (p=0.000 n=10)
+V8_ColdStart/QuerySelectors-16    1.931m ± 11%   1.796m ± 1%  -7.03% (p=0.000 n=10)
+V8_ColdStart/ReadAttributes-16    1.921m ±  2%   1.808m ± 1%  -5.86% (p=0.000 n=10)
+V8_ColdStart/WriteAttributes-16   1.910m ±  1%   1.834m ± 1%  -3.98% (p=0.000 n=10)
+V8_ColdStart/DomMutation-16       1.993m ±  5%   1.859m ± 1%  -6.76% (p=0.000 n=10)
+V8_ColdStart/TreeNavigation-16    2.038m ±  3%   1.960m ± 1%  -3.83% (p=0.000 n=10)
+V8_ColdStart/MixedRealistic-16    2.089m ±  2%   2.003m ± 1%  -4.10% (p=0.000 n=10)
+V8_CleanupOnly-16                 1.631µ ±  1%   1.597µ ± 1%  -2.05% (p=0.000 n=10)
+geomean                           384.7µ         362.3µ       -5.83%
+
+                                │    task14    │                task24                 │
+                                │     B/op     │     B/op      vs base                 │
+V8_Cleanup/QuerySelectors-16      77.92Ki ± 0%   77.92Ki ± 0%       ~ (p=0.601 n=10)
+V8_Cleanup/ReadAttributes-16      81.78Ki ± 0%   81.78Ki ± 0%       ~ (p=0.628 n=10)
+V8_Cleanup/WriteAttributes-16     131.4Ki ± 0%   131.4Ki ± 0%       ~ (p=1.000 n=10)
+V8_Cleanup/DomMutation-16         164.3Ki ± 0%   164.3Ki ± 0%       ~ (p=0.924 n=10)
+V8_Cleanup/TreeNavigation-16      150.7Ki ± 0%   150.7Ki ± 0%       ~ (p=0.055 n=10)
+V8_Cleanup/MixedRealistic-16      113.3Ki ± 0%   113.3Ki ± 0%       ~ (p=0.650 n=10)
+V8_ColdStart/QuerySelectors-16    82.95Ki ± 0%   82.95Ki ± 0%       ~ (p=0.551 n=10)
+V8_ColdStart/ReadAttributes-16    86.81Ki ± 0%   86.81Ki ± 0%       ~ (p=0.370 n=10)
+V8_ColdStart/WriteAttributes-16   136.4Ki ± 0%   136.4Ki ± 0%       ~ (p=0.321 n=10)
+V8_ColdStart/DomMutation-16       169.5Ki ± 0%   169.5Ki ± 0%       ~ (p=0.256 n=10)
+V8_ColdStart/TreeNavigation-16    155.8Ki ± 0%   155.8Ki ± 0%       ~ (p=0.266 n=10)
+V8_ColdStart/MixedRealistic-16    118.3Ki ± 0%   118.3Ki ± 0%       ~ (p=0.127 n=10)
+V8_CleanupOnly-16                   320.0 ± 0%     320.0 ± 0%       ~ (p=1.000 n=10) ¹
+geomean                           74.69Ki        74.69Ki       -0.00%
+¹ all samples are equal
+
+                                │   task14    │                task24                │
+                                │  allocs/op  │  allocs/op   vs base                 │
+V8_Cleanup/QuerySelectors-16      1.363k ± 0%   1.363k ± 0%       ~ (p=1.000 n=10) ¹
+V8_Cleanup/ReadAttributes-16      1.112k ± 0%   1.112k ± 0%       ~ (p=1.000 n=10) ¹
+V8_Cleanup/WriteAttributes-16     1.353k ± 0%   1.353k ± 0%       ~ (p=1.000 n=10) ¹
+V8_Cleanup/DomMutation-16         1.430k ± 0%   1.430k ± 0%       ~ (p=1.000 n=10) ¹
+V8_Cleanup/TreeNavigation-16      2.933k ± 0%   2.933k ± 0%       ~ (p=1.000 n=10) ¹
+V8_Cleanup/MixedRealistic-16      2.021k ± 0%   2.021k ± 0%       ~ (p=1.000 n=10) ¹
+V8_ColdStart/QuerySelectors-16    1.549k ± 0%   1.549k ± 0%       ~ (p=1.000 n=10) ¹
+V8_ColdStart/ReadAttributes-16    1.298k ± 0%   1.298k ± 0%       ~ (p=1.000 n=10) ¹
+V8_ColdStart/WriteAttributes-16   1.539k ± 0%   1.539k ± 0%       ~ (p=1.000 n=10) ¹
+V8_ColdStart/DomMutation-16       1.616k ± 0%   1.616k ± 0%       ~ (p=1.000 n=10) ¹
+V8_ColdStart/TreeNavigation-16    3.119k ± 0%   3.119k ± 0%       ~ (p=1.000 n=10) ¹
+V8_ColdStart/MixedRealistic-16    2.207k ± 0%   2.207k ± 0%       ~ (p=1.000 n=10) ¹
+V8_CleanupOnly-16                  11.00 ± 0%    11.00 ± 0%       ~ (p=1.000 n=10) ¹
+geomean                           1.156k        1.156k       +0.00%
+¹ all samples are equal
