@@ -41,3 +41,8 @@ func NewContextWithFuncs(iso *Isolate, fns map[string]func(*FunctionCallbackInfo
 	}
 	return v8.NewContext(iso, global)
 }
+
+type soakPayload struct{ n int }
+
+// goPayload is a Go value exposed to JS (a weak-owned External in the new version).
+func goPayload(i int) interface{} { return &soakPayload{n: i} }

@@ -1,0 +1,121 @@
+//go:build soak && linux
+
+package bench
+
+import (
+	"fmt"
+	"os"
+	"runtime"
+	"strconv"
+	"strings"
+	"testing"
+)
+
+func rssBytes(tb testing.TB) uint64 {
+	tb.Helper()
+	b, err := os.ReadFile("/proc/self/status")
+	if err != nil {
+		tb.Fatal(err)
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(line, "VmRSS:") {
+			kb, err := strconv.ParseUint(strings.Fields(line)[1], 10, 64)
+			if err != nil {
+				tb.Fatal(err)
+			}
+			return kb * 1024
+		}
+	}
+	tb.Fatal("VmRSS not found")
+	return 0
+}
+
+// growthSecondHalf is the relative growth between the middle and the last sample.
+func growthSecondHalf(samples []uint64) float64 {
+	mid, last := samples[len(samples)/2], samples[len(samples)-1]
+	return float64(last)/float64(mid) - 1
+}
+
+func soakIterations() int {
+	if s := os.Getenv("SOAK_ITERATIONS"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n >= 2000 {
+			return n
+		}
+	}
+	return 100000
+}
+
+// One long-lived isolate/context, reused like gojs does: run scripts, call Go
+// from JS, wrap Go values, compile from a code cache, then Cleanup.
+func TestSoakCleanup(t *testing.T) {
+	iters := soakIterations()
+	iso := NewIsolate()
+	defer iso.Dispose()
+	ctx := NewContextWithFuncs(iso, map[string]func(*FunctionCallbackInfo) *Value{
+		"goAdd": func(info *FunctionCallbackInfo) *Value {
+			args := info.Args()
+			v, _ := NewValue(iso, args[0].Int32()+args[1].Int32())
+			return v
+		},
+	})
+	defer ctx.Close()
+	mustRun(t, ctx, jsWorkloads)
+
+	const script = "var s = 0; for (let i = 0; i < 50; i++) s = goAdd(s, 1); var o = wlObjects(); new Promise(() => {}); s"
+	us, err := iso.CompileUnboundScript(script, "soak.js", CompileOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cache := us.CreateCodeCache()
+	goroutines := runtime.NumGoroutine()
+
+	var rss, heap, goHeap []uint64
+	var ms runtime.MemStats
+	for i := 0; i < iters; i++ {
+		us, err := iso.CompileUnboundScript(script, "soak.js", CompileOptions{CachedData: cache})
+		if err != nil {
+			t.Fatal(err)
+		}
+		v, err := us.Run(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v.Int32() != 50 {
+			t.Fatalf("iteration %d: expected 50, got %v", i, v)
+		}
+		if _, err := NewValue(iso, goPayload(i)); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Cleanup()
+		iso.Cleanup()
+
+		if i%1000 == 999 {
+			runtime.GC()
+			runtime.ReadMemStats(&ms)
+			rss = append(rss, rssBytes(t))
+			heap = append(heap, iso.GetHeapStatistics().UsedHeapSize)
+			goHeap = append(goHeap, ms.HeapAlloc)
+		}
+	}
+
+	if out := os.Getenv("SOAK_OUT"); out != "" {
+		var sb strings.Builder
+		sb.WriteString("iteration,rss,v8heap,goheap\n")
+		for j := range rss {
+			fmt.Fprintf(&sb, "%d,%d,%d,%d\n", (j+1)*1000, rss[j], heap[j], goHeap[j])
+		}
+		if err := os.WriteFile(out, []byte(sb.String()), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	g := growthSecondHalf(rss)
+	t.Logf("%s: RSS %d -> %d MiB, second-half growth %.2f%%, V8 heap last %d KiB, Go heap last %d KiB",
+		Version, rss[0]>>20, rss[len(rss)-1]>>20, g*100, heap[len(heap)-1]>>10, goHeap[len(goHeap)-1]>>10)
+	if g > 0.05 {
+		t.Errorf("RSS grew %.2f%% over the second half (limit 5%%): leak", g*100)
+	}
+	if n := runtime.NumGoroutine(); n > goroutines+2 {
+		t.Errorf("goroutines grew from %d to %d", goroutines, n)
+	}
+}

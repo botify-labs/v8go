@@ -41,3 +41,6 @@ func NewContextWithFuncs(iso *Isolate, fns map[string]func(*FunctionCallbackInfo
 	}
 	return v8.NewContext(iso, global)
 }
+
+// goPayload: Go values in JS don't exist in 6f9829d; use a string instead.
+func goPayload(i int) interface{} { return "payload" }
