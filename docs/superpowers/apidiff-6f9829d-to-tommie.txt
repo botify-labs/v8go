@@ -1,0 +1,1 @@
+- NewIsolate: changed from func() *Isolate to func(...IsolateOption) *Isolate
