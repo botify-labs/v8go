@@ -10,6 +10,7 @@
 /tools/build_bridge.sh
 /tools/bridge_hash.sh
 /tools/check_bridge.sh
+/tools/check_no_allocator_shim.sh
 /tools/pin_deps.sh
 /cleanup.h
 /cleanup.cc

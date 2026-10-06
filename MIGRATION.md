@@ -59,6 +59,12 @@ Pour gojs, c'est le seul changement : l'import. Le reste du code n'a pas bougé.
   - re-récupérer `Undefined(iso)` / `Null(iso)` après `Cleanup()` ;
   - un `TerminateExecution` (watchdog) ou le callback de limite de heap peut prendre effet pendant
     `Cleanup()` et affecter le `RunScript` suivant.
+- V8 n'installe plus PartitionAlloc comme `malloc` du processus. Les libs V8 précompilées de
+  tommie embarquent l'*allocator shim* de PartitionAlloc, qui remplace `malloc`/`free`/`new`/`delete`
+  pour tout le binaire consommateur. Il est retiré à l'import (`tools/sync_tommie.sh`). Le `malloc`
+  de la glibc (ou du système : zone par défaut sous macOS, UCRT sous Windows) reste donc en place
+  pour tout le code C/C++ du consommateur (cgo, liburlnorm, zstd, igzip…), comme avec la baseline.
+  `tools/check_no_allocator_shim.sh` le vérifie.
 
 ## 4. Changements d'API
 

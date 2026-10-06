@@ -9,6 +9,13 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
 - `cleanup.*` : `Isolate.Cleanup()` / `Context.Cleanup()`. `Isolate.Cleanup()` exécute les tâches
   V8 de l'isolate ; le soak (`bench/soak_test.go`) ne passe que grâce au timer du memory reducer de
   V8 (≥ 8 s) : le soak de 100k itérations doit durer assez longtemps (~20 s) pour qu'il se déclenche.
+- **Allocator shim retiré** : les libs V8 de tommie embarquent l'*allocator shim* de PartitionAlloc,
+  qui remplacerait `malloc`/`free`/`new`/`delete` pour tout le processus consommateur (+16 à +40 %
+  sur les appels unitaires, Task 14). `tools/sync_tommie.sh` retire ses membres des archives V8
+  (`llvm-ar d`, format d'archive conservé) à chaque import, puis lance
+  `tools/check_no_allocator_shim.sh`, qui échoue s'il reste un membre du shim ou une définition de
+  `malloc`/`free`/`new`/`delete` dans une archive V8. Il faut `llvm-ar`/`llvm-ranlib`/`llvm-nm`
+  (présents dans l'image Docker).
 - `bench/` : comparaison avec `v0.6.0-botify-baseline` (V8 9.0). `tools/docker/` : environnement de dev.
 
 Mettre à jour V8 :
