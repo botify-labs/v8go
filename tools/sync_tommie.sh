@@ -49,7 +49,12 @@ for src in *.cc; do
 done
 for f in deps/*_*/cgo.go; do
   grep -q -- '-lv8go' "$f" ||
-    sed -i '/^\/\/ #cgo LDFLAGS: -L\${SRCDIR}$/a // #cgo !v8go_source LDFLAGS: -lv8go\n// #cgo linux,!v8go_source LDFLAGS: -lm' "$f"
+    sed -i '/^\/\/ #cgo LDFLAGS: -L\${SRCDIR}$/a // #cgo !v8go_source LDFLAGS: -lv8go' "$f"
+  # Consumers link with $CC, which doesn't add libm like $CXX does. -lm goes
+  # after the V8 archives: Ubuntu's gcc links with --as-needed, which drops a
+  # shared library that nothing before it on the command line needs.
+  sed -i '/^\/\/ #cgo linux,!v8go_source LDFLAGS: -lm$/d' "$f"
+  sed -i '/^\/\/ #cgo LDFLAGS: .*-lv8-0 /a // #cgo linux,!v8go_source LDFLAGS: -lm' "$f"
 done
 
 # PartitionAlloc's allocator shim would replace malloc/free/new/delete for the
