@@ -1,0 +1,77 @@
+name: Botify Bench
+
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: benchmark -count
+        default: '10'
+
+jobs:
+  compare:
+    # Platforms with a V8 9.0 baseline library: baseline vs new (consumer build).
+    name: Baseline vs new on ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.platform }}
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        path: v8go
+    - uses: actions/checkout@v7
+      with:
+        ref: v0.6.0-botify-baseline
+        path: v8go-baseline
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - name: Baseline
+      working-directory: v8go/bench
+      run: GOWORK=off go test -tags v8baseline -run '^$' -bench . -benchmem -count ${{ inputs.count }} -timeout 4h . | tee baseline.txt
+    - name: New
+      working-directory: v8go/bench
+      run: GOWORK=off go test -run '^$' -bench . -benchmem -count ${{ inputs.count }} -timeout 4h . | tee new.txt
+    - name: Compare
+      working-directory: v8go/bench
+      run: |
+        go install golang.org/x/perf/cmd/benchstat@latest
+        "$(go env GOPATH)/bin/benchstat" baseline=baseline.txt new=new.txt | tee -a "$GITHUB_STEP_SUMMARY"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: bench-${{ matrix.platform }}
+        path: v8go/bench/*.txt
+
+  new-only:
+    # No V8 9.0 baseline exists for these platforms.
+    name: New only on ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - { platform: ubuntu-24.04-arm, cc: gcc }
+        - { platform: windows-latest, cc: 'clang -fuse-ld=lld' }
+    runs-on: ${{ matrix.platform }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        path: v8go
+    - uses: ./v8go/.github/actions/setup-clang
+      if: runner.os == 'Windows'
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - name: New
+      working-directory: v8go/bench
+      run: |
+        mkdir -p ../../v8go-baseline && printf 'module rogchap.com/v8go\n\ngo 1.16\n' >../../v8go-baseline/go.mod
+        CC="${{ matrix.cc }}" GOWORK=off go test -run '^$' -bench . -benchmem -count ${{ inputs.count }} -timeout 4h . | tee new.txt
+        cat new.txt >>"$GITHUB_STEP_SUMMARY"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: bench-${{ matrix.platform }}
+        path: v8go/bench/new.txt

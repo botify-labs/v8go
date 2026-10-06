@@ -1,0 +1,90 @@
+name: Botify CI
+
+on:
+  push:
+    branches: [master, upgrade-v8]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  bridge-fresh:
+    name: Prebuilt bridges match sources
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+    - name: Install llvm (llvm-ar and llvm-nm for the allocator shim check)
+      run: sudo apt-get update && sudo apt-get install -y llvm
+    - run: tools/check_bridge.sh
+    - name: V8 archives carry no allocator shim
+      run: tools/check_no_allocator_shim.sh
+
+  test:
+    name: Tests on ${{ matrix.os }} ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - { os: linux, arch: amd64, platform: ubuntu-24.04, consumer_cc: gcc, race: -race }
+        - { os: linux, arch: arm64, platform: ubuntu-24.04-arm, consumer_cc: gcc, race: -race }
+        - { os: darwin, arch: amd64, platform: macos-15-intel, consumer_cc: /usr/bin/clang, race: -race }
+        - { os: darwin, arch: arm64, platform: macos-15, consumer_cc: /usr/bin/clang, race: -race }
+        - { os: windows, arch: amd64, platform: windows-latest, consumer_cc: 'clang -fuse-ld=lld', race: -race }
+    runs-on: ${{ matrix.platform }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup-clang
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - run: go work init . ./deps/${{ matrix.os }}_${{ matrix.arch }}
+    - name: Build the bridge from the current sources
+      run: tools/build_bridge.sh
+    - name: Consumer-mode tests (prebuilt bridge, system compiler, no flags)
+      run: CC="${{ matrix.consumer_cc }}" CGO_CXXFLAGS= go test ${{ matrix.race }} -count=1 ./...
+    - name: glibc floor of a consumer binary (at most GLIBC_2.34)
+      if: matrix.os == 'linux' && matrix.arch == 'amd64'
+      run: |
+        CC="${{ matrix.consumer_cc }}" CGO_CXXFLAGS= go test -c -o v8go.test .
+        max=$(objdump -T v8go.test | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1)
+        echo "highest glibc symbol version: ${max:-none}"
+        [ -n "$max" ] || { echo "no GLIBC_ symbol found: is v8go.test a dynamic binary?" >&2; exit 1; }
+        top=$(printf '%s\nGLIBC_2.34\n' "$max" | sort -V | tail -1)
+        [ "$top" = GLIBC_2.34 ] || { echo "v8go.test needs $max, newer than GLIBC_2.34" >&2; exit 1; }
+    - name: Source-mode tests
+      run: go test -tags v8go_source -count=1 ./...
+      env:
+        CGO_CXXFLAGS: "-nostdinc++"
+
+  leakcheck:
+    name: LeakSanitizer (source mode)
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup-clang
+      with:
+        extra-packages: libclang-rt-{version}-dev
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - run: go work init . ./deps/linux_amd64
+    - run: go test -c -tags "leakcheck v8go_source" -o v8go.test . && ./v8go.test
+      env:
+        CGO_CXXFLAGS: "-nostdinc++"
+
+  soak:
+    name: Cleanup soak (consumer mode)
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - name: Soak
+      working-directory: bench
+      run: |
+        # bench/go.mod replaces the baseline module; only -tags v8baseline imports it.
+        mkdir -p ../../v8go-baseline && printf 'module rogchap.com/v8go\n\ngo 1.16\n' >../../v8go-baseline/go.mod
+        SOAK_ITERATIONS=30000 GOWORK=off CC=gcc go test -tags soak -run TestSoakCleanup -v -timeout 1h .

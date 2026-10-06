@@ -1,0 +1,50 @@
+name: Botify Sync Upstream
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: tommie/v8go commit (default master)
+        required: false
+  schedule:
+  - cron: '0 6 * * 1' # Mondays
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+    - uses: actions/checkout@v7
+    - name: Resolve tommie commit
+      id: sha
+      run: |
+        sha="${{ inputs.sha }}"
+        [ -n "$sha" ] || sha=$(git ls-remote https://github.com/tommie/v8go.git refs/heads/master | cut -f1)
+        echo "sha=$sha" >>"$GITHUB_OUTPUT"
+    - name: Skip if already imported
+      id: check
+      run: |
+        if [ "$(cat deps/tommie_sha)" = "${{ steps.sha.outputs.sha }}" ]; then echo "skip=true" >>"$GITHUB_OUTPUT"; fi
+    - uses: actions/setup-go@v7
+      if: steps.check.outputs.skip != 'true'
+      with:
+        go-version: '1.27'
+    - name: Install llvm (llvm-ar, llvm-ranlib and llvm-nm strip the allocator shim)
+      if: steps.check.outputs.skip != 'true'
+      run: sudo apt-get update && sudo apt-get install -y llvm
+    - name: Import
+      if: steps.check.outputs.skip != 'true'
+      run: tools/sync_tommie.sh "${{ steps.sha.outputs.sha }}"
+    - uses: peter-evans/create-pull-request@v7
+      if: steps.check.outputs.skip != 'true'
+      with:
+        branch: sync/tommie-${{ steps.sha.outputs.sha }}
+        title: Sync tommie/v8go@${{ steps.sha.outputs.sha }}
+        commit-message: Import tommie/v8go@${{ steps.sha.outputs.sha }}
+        body: |
+          Automated import by tools/sync_tommie.sh.
+          1. Run the "Botify Bridge" workflow on this branch (the prebuilt bridges are stale until then).
+          2. Botify CI must pass: consumer and source tests on 5 targets, LeakSanitizer, Cleanup soak.
+          3. After merge: tools/pin_deps.sh <merge sha>.
