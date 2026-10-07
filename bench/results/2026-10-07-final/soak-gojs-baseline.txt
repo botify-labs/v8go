@@ -1,0 +1,7 @@
+=== RUN   TestSoakV8Cleanup
+    soak_test.go:118: post-GC RSS 36 -> 45 MiB, second-half growth 5.33%, peak RSS 45 MiB, Go heap last 902 KiB
+    soak_test.go:121: post-GC RSS grew 5.33% over the second half (limit 5%): leak
+--- FAIL: TestSoakV8Cleanup (19.05s)
+FAIL
+FAIL	github.com/botify-hq/cdf/gojs	19.060s
+FAIL
