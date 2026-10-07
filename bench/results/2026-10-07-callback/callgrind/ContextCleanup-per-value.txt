@@ -1,0 +1,29 @@
+Cleanup1000Values: instructions per unit ((Ir@40 ops - Ir@20 ops) / 20000)
+
+variant  total
+base          175
+v0            388
+v4sp          205
+v4            182
+
+By category (self cost):
+category                     base       v0     v4sp       v4
+libc malloc/free              121      237      133      118
+V8                             42       49       49       49
+v8go C++                       12      101       22       14
+other                           0        2        1        1
+
+Top functions (self cost per callback, union of each variant's top 45):
+     base       v0     v4sp       v4  function
+       94      188       94       94  _int_free
+        0       75        0        0  std::__Cr::__hash_table<std::__Cr::__hash_value_type<long, m_value*>, std::__Cr::__unordered_map_hasher<long, std::__Cr::pair<long const, m_value*>, s
+       38        6        6        6  v8::internal::GlobalHandles::Destroy(unsigned long*)
+        0       38       38       38  v8::internal::GlobalHandles::NodeSpace<v8::internal::GlobalHandles::Node>::Release(v8::internal::GlobalHandles::Node*)
+       21       33       32       16  free
+       12       26       22       14  ContextCleanup
+        3        8        4        4  operator delete(void*)
+        3        8        4        4  operator delete(void*, unsigned long)
+
+Inclusive cost per callback of v8go entry points:
+     base       v0     v4sp       v4  function
+      402     1155      205      182  runtime.cgocall

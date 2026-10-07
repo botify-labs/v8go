@@ -1,0 +1,180 @@
+goos: linux
+goarch: amd64
+pkg: github.com/botify-hq/cdf/gojs
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkV8_Cleanup/QuerySelectors-16         	    6036	    170663 ns/op	   79798 B/op	    1363 allocs/op
+BenchmarkV8_Cleanup/ReadAttributes-16         	    7419	    168519 ns/op	   83749 B/op	    1112 allocs/op
+BenchmarkV8_Cleanup/WriteAttributes-16        	    6834	    194693 ns/op	  134527 B/op	    1353 allocs/op
+BenchmarkV8_Cleanup/DomMutation-16            	    5124	    206618 ns/op	  168260 B/op	    1430 allocs/op
+BenchmarkV8_Cleanup/TreeNavigation-16         	    4357	    274780 ns/op	  154364 B/op	    2933 allocs/op
+BenchmarkV8_Cleanup/MixedRealistic-16         	    4317	    291020 ns/op	  116027 B/op	    2021 allocs/op
+BenchmarkV8_ColdStart/QuerySelectors-16       	     632	   1920332 ns/op	   84944 B/op	    1549 allocs/op
+BenchmarkV8_ColdStart/ReadAttributes-16       	     632	   1905072 ns/op	   88898 B/op	    1298 allocs/op
+BenchmarkV8_ColdStart/WriteAttributes-16      	     620	   2004796 ns/op	  139673 B/op	    1539 allocs/op
+BenchmarkV8_ColdStart/DomMutation-16          	     613	   2082625 ns/op	  173619 B/op	    1616 allocs/op
+BenchmarkV8_ColdStart/TreeNavigation-16       	     585	   2099001 ns/op	  159513 B/op	    3119 allocs/op
+BenchmarkV8_ColdStart/MixedRealistic-16       	     548	   2104936 ns/op	  121178 B/op	    2207 allocs/op
+BenchmarkV8_CleanupOnly-16                    	  629620	      1709 ns/op	     320 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-hq/cdf/gojs
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkV8_Cleanup/QuerySelectors-16         	    6356	    162732 ns/op	   79799 B/op	    1363 allocs/op
+BenchmarkV8_Cleanup/ReadAttributes-16         	    6690	    170601 ns/op	   83747 B/op	    1112 allocs/op
+BenchmarkV8_Cleanup/WriteAttributes-16        	    5929	    191026 ns/op	  134527 B/op	    1353 allocs/op
+BenchmarkV8_Cleanup/DomMutation-16            	    5112	    217040 ns/op	  168262 B/op	    1430 allocs/op
+BenchmarkV8_Cleanup/TreeNavigation-16         	    4522	    277449 ns/op	  154366 B/op	    2933 allocs/op
+BenchmarkV8_Cleanup/MixedRealistic-16         	    4470	    295923 ns/op	  116030 B/op	    2021 allocs/op
+BenchmarkV8_ColdStart/QuerySelectors-16       	     662	   1839746 ns/op	   84945 B/op	    1549 allocs/op
+BenchmarkV8_ColdStart/ReadAttributes-16       	     619	   1860812 ns/op	   88896 B/op	    1298 allocs/op
+BenchmarkV8_ColdStart/WriteAttributes-16      	     639	   1916402 ns/op	  139673 B/op	    1539 allocs/op
+BenchmarkV8_ColdStart/DomMutation-16          	     628	   1993231 ns/op	  173612 B/op	    1616 allocs/op
+BenchmarkV8_ColdStart/TreeNavigation-16       	     574	   2005200 ns/op	  159514 B/op	    3119 allocs/op
+BenchmarkV8_ColdStart/MixedRealistic-16       	     583	   2179498 ns/op	  121176 B/op	    2207 allocs/op
+BenchmarkV8_CleanupOnly-16                    	  686798	      1636 ns/op	     320 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-hq/cdf/gojs
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkV8_Cleanup/QuerySelectors-16         	    7544	    167715 ns/op	   79796 B/op	    1363 allocs/op
+BenchmarkV8_Cleanup/ReadAttributes-16         	    6555	    167123 ns/op	   83747 B/op	    1112 allocs/op
+BenchmarkV8_Cleanup/WriteAttributes-16        	    6331	    194756 ns/op	  134528 B/op	    1353 allocs/op
+BenchmarkV8_Cleanup/DomMutation-16            	    5023	    216748 ns/op	  168246 B/op	    1430 allocs/op
+BenchmarkV8_Cleanup/TreeNavigation-16         	    4389	    287689 ns/op	  154364 B/op	    2933 allocs/op
+BenchmarkV8_Cleanup/MixedRealistic-16         	    3620	    322295 ns/op	  116028 B/op	    2021 allocs/op
+BenchmarkV8_ColdStart/QuerySelectors-16       	     632	   1893795 ns/op	   84946 B/op	    1549 allocs/op
+BenchmarkV8_ColdStart/ReadAttributes-16       	     642	   1870103 ns/op	   88897 B/op	    1298 allocs/op
+BenchmarkV8_ColdStart/WriteAttributes-16      	     626	   1984408 ns/op	  139676 B/op	    1539 allocs/op
+BenchmarkV8_ColdStart/DomMutation-16          	     610	   1915266 ns/op	  173599 B/op	    1616 allocs/op
+BenchmarkV8_ColdStart/TreeNavigation-16       	     600	   2012641 ns/op	  159515 B/op	    3119 allocs/op
+BenchmarkV8_ColdStart/MixedRealistic-16       	     559	   2103597 ns/op	  121182 B/op	    2207 allocs/op
+BenchmarkV8_CleanupOnly-16                    	  604876	      1721 ns/op	     320 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-hq/cdf/gojs
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkV8_Cleanup/QuerySelectors-16         	    6130	    166708 ns/op	   79798 B/op	    1363 allocs/op
+BenchmarkV8_Cleanup/ReadAttributes-16         	    6535	    166434 ns/op	   83749 B/op	    1112 allocs/op
+BenchmarkV8_Cleanup/WriteAttributes-16        	    7033	    185831 ns/op	  134528 B/op	    1353 allocs/op
+BenchmarkV8_Cleanup/DomMutation-16            	    4821	    208662 ns/op	  168271 B/op	    1430 allocs/op
+BenchmarkV8_Cleanup/TreeNavigation-16         	    3786	    281923 ns/op	  154366 B/op	    2933 allocs/op
+BenchmarkV8_Cleanup/MixedRealistic-16         	    3584	    305494 ns/op	  116028 B/op	    2021 allocs/op
+BenchmarkV8_ColdStart/QuerySelectors-16       	     620	   1942634 ns/op	   84945 B/op	    1549 allocs/op
+BenchmarkV8_ColdStart/ReadAttributes-16       	     631	   1878397 ns/op	   88897 B/op	    1298 allocs/op
+BenchmarkV8_ColdStart/WriteAttributes-16      	     572	   2020321 ns/op	  139672 B/op	    1539 allocs/op
+BenchmarkV8_ColdStart/DomMutation-16          	     614	   2013754 ns/op	  173584 B/op	    1616 allocs/op
+BenchmarkV8_ColdStart/TreeNavigation-16       	     594	   2095659 ns/op	  159513 B/op	    3119 allocs/op
+BenchmarkV8_ColdStart/MixedRealistic-16       	     560	   2202271 ns/op	  121187 B/op	    2207 allocs/op
+BenchmarkV8_CleanupOnly-16                    	  609987	      1663 ns/op	     320 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-hq/cdf/gojs
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkV8_Cleanup/QuerySelectors-16         	    7382	    164568 ns/op	   79796 B/op	    1363 allocs/op
+BenchmarkV8_Cleanup/ReadAttributes-16         	    7476	    173054 ns/op	   83748 B/op	    1112 allocs/op
+BenchmarkV8_Cleanup/WriteAttributes-16        	    6625	    178174 ns/op	  134527 B/op	    1353 allocs/op
+BenchmarkV8_Cleanup/DomMutation-16            	    6067	    204314 ns/op	  168286 B/op	    1430 allocs/op
+BenchmarkV8_Cleanup/TreeNavigation-16         	    4210	    283443 ns/op	  154363 B/op	    2933 allocs/op
+BenchmarkV8_Cleanup/MixedRealistic-16         	    3956	    300359 ns/op	  116027 B/op	    2021 allocs/op
+BenchmarkV8_ColdStart/QuerySelectors-16       	     579	   1851071 ns/op	   84944 B/op	    1549 allocs/op
+BenchmarkV8_ColdStart/ReadAttributes-16       	     598	   1922996 ns/op	   88896 B/op	    1298 allocs/op
+BenchmarkV8_ColdStart/WriteAttributes-16      	     608	   1930680 ns/op	  139682 B/op	    1539 allocs/op
+BenchmarkV8_ColdStart/DomMutation-16          	     612	   1986299 ns/op	  173535 B/op	    1616 allocs/op
+BenchmarkV8_ColdStart/TreeNavigation-16       	     570	   2054587 ns/op	  159512 B/op	    3119 allocs/op
+BenchmarkV8_ColdStart/MixedRealistic-16       	     549	   2123016 ns/op	  121186 B/op	    2207 allocs/op
+BenchmarkV8_CleanupOnly-16                    	  647798	      1739 ns/op	     320 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-hq/cdf/gojs
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkV8_Cleanup/QuerySelectors-16         	    6826	    164370 ns/op	   79798 B/op	    1363 allocs/op
+BenchmarkV8_Cleanup/ReadAttributes-16         	    6717	    164488 ns/op	   83749 B/op	    1112 allocs/op
+BenchmarkV8_Cleanup/WriteAttributes-16        	    6268	    195231 ns/op	  134528 B/op	    1353 allocs/op
+BenchmarkV8_Cleanup/DomMutation-16            	    6852	    204284 ns/op	  168270 B/op	    1430 allocs/op
+BenchmarkV8_Cleanup/TreeNavigation-16         	    4722	    276402 ns/op	  154365 B/op	    2933 allocs/op
+BenchmarkV8_Cleanup/MixedRealistic-16         	    3626	    289797 ns/op	  116027 B/op	    2021 allocs/op
+BenchmarkV8_ColdStart/QuerySelectors-16       	     648	   1861735 ns/op	   84948 B/op	    1549 allocs/op
+BenchmarkV8_ColdStart/ReadAttributes-16       	     648	   1886368 ns/op	   88899 B/op	    1298 allocs/op
+BenchmarkV8_ColdStart/WriteAttributes-16      	     663	   1884567 ns/op	  139674 B/op	    1539 allocs/op
+BenchmarkV8_ColdStart/DomMutation-16          	     658	   1927245 ns/op	  173597 B/op	    1616 allocs/op
+BenchmarkV8_ColdStart/TreeNavigation-16       	     580	   1995967 ns/op	  159524 B/op	    3119 allocs/op
+BenchmarkV8_ColdStart/MixedRealistic-16       	     570	   2203650 ns/op	  121177 B/op	    2207 allocs/op
+BenchmarkV8_CleanupOnly-16                    	  705795	      1618 ns/op	     320 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-hq/cdf/gojs
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkV8_Cleanup/QuerySelectors-16         	    6508	    154103 ns/op	   79800 B/op	    1363 allocs/op
+BenchmarkV8_Cleanup/ReadAttributes-16         	    7368	    149057 ns/op	   83750 B/op	    1112 allocs/op
+BenchmarkV8_Cleanup/WriteAttributes-16        	    6098	    173447 ns/op	  134529 B/op	    1353 allocs/op
+BenchmarkV8_Cleanup/DomMutation-16            	    6736	    180731 ns/op	  168220 B/op	    1430 allocs/op
+BenchmarkV8_Cleanup/TreeNavigation-16         	    4201	    255455 ns/op	  154366 B/op	    2933 allocs/op
+BenchmarkV8_Cleanup/MixedRealistic-16         	    4118	    260508 ns/op	  116027 B/op	    2021 allocs/op
+BenchmarkV8_ColdStart/QuerySelectors-16       	     660	   1828467 ns/op	   84946 B/op	    1549 allocs/op
+BenchmarkV8_ColdStart/ReadAttributes-16       	     662	   1899739 ns/op	   88896 B/op	    1298 allocs/op
+BenchmarkV8_ColdStart/WriteAttributes-16      	     613	   1871195 ns/op	  139674 B/op	    1539 allocs/op
+BenchmarkV8_ColdStart/DomMutation-16          	     643	   1842723 ns/op	  173639 B/op	    1616 allocs/op
+BenchmarkV8_ColdStart/TreeNavigation-16       	     597	   1994917 ns/op	  159513 B/op	    3119 allocs/op
+BenchmarkV8_ColdStart/MixedRealistic-16       	     589	   2199657 ns/op	  121177 B/op	    2207 allocs/op
+BenchmarkV8_CleanupOnly-16                    	  715263	      1546 ns/op	     320 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-hq/cdf/gojs
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkV8_Cleanup/QuerySelectors-16         	    6349	    168972 ns/op	   79798 B/op	    1363 allocs/op
+BenchmarkV8_Cleanup/ReadAttributes-16         	    6878	    161753 ns/op	   83750 B/op	    1112 allocs/op
+BenchmarkV8_Cleanup/WriteAttributes-16        	    5691	    175844 ns/op	  134528 B/op	    1353 allocs/op
+BenchmarkV8_Cleanup/DomMutation-16            	    6067	    188169 ns/op	  168260 B/op	    1430 allocs/op
+BenchmarkV8_Cleanup/TreeNavigation-16         	    4524	    268711 ns/op	  154367 B/op	    2933 allocs/op
+BenchmarkV8_Cleanup/MixedRealistic-16         	    4375	    282497 ns/op	  116028 B/op	    2021 allocs/op
+BenchmarkV8_ColdStart/QuerySelectors-16       	     666	   1870644 ns/op	   84947 B/op	    1549 allocs/op
+BenchmarkV8_ColdStart/ReadAttributes-16       	     672	   1813038 ns/op	   88907 B/op	    1298 allocs/op
+BenchmarkV8_ColdStart/WriteAttributes-16      	     638	   1864035 ns/op	  139674 B/op	    1539 allocs/op
+BenchmarkV8_ColdStart/DomMutation-16          	     632	   1941960 ns/op	  173602 B/op	    1616 allocs/op
+BenchmarkV8_ColdStart/TreeNavigation-16       	     594	   1983946 ns/op	  159516 B/op	    3119 allocs/op
+BenchmarkV8_ColdStart/MixedRealistic-16       	     591	   2140813 ns/op	  121177 B/op	    2207 allocs/op
+BenchmarkV8_CleanupOnly-16                    	  647286	      1667 ns/op	     320 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-hq/cdf/gojs
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkV8_Cleanup/QuerySelectors-16         	    6673	    160992 ns/op	   79798 B/op	    1363 allocs/op
+BenchmarkV8_Cleanup/ReadAttributes-16         	    6739	    157712 ns/op	   83749 B/op	    1112 allocs/op
+BenchmarkV8_Cleanup/WriteAttributes-16        	    6570	    197089 ns/op	  134526 B/op	    1353 allocs/op
+BenchmarkV8_Cleanup/DomMutation-16            	    4683	    230319 ns/op	  168297 B/op	    1430 allocs/op
+BenchmarkV8_Cleanup/TreeNavigation-16         	    3855	    274570 ns/op	  154365 B/op	    2933 allocs/op
+BenchmarkV8_Cleanup/MixedRealistic-16         	    3847	    287270 ns/op	  116026 B/op	    2021 allocs/op
+BenchmarkV8_ColdStart/QuerySelectors-16       	     684	   1767698 ns/op	   84948 B/op	    1549 allocs/op
+BenchmarkV8_ColdStart/ReadAttributes-16       	     657	   1913622 ns/op	   88902 B/op	    1298 allocs/op
+BenchmarkV8_ColdStart/WriteAttributes-16      	     612	   1914399 ns/op	  139674 B/op	    1539 allocs/op
+BenchmarkV8_ColdStart/DomMutation-16          	     597	   2005076 ns/op	  173673 B/op	    1616 allocs/op
+BenchmarkV8_ColdStart/TreeNavigation-16       	     615	   2056484 ns/op	  159517 B/op	    3119 allocs/op
+BenchmarkV8_ColdStart/MixedRealistic-16       	     559	   2095784 ns/op	  121178 B/op	    2207 allocs/op
+BenchmarkV8_CleanupOnly-16                    	  744073	      1637 ns/op	     320 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-hq/cdf/gojs
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkV8_Cleanup/QuerySelectors-16         	    7353	    162778 ns/op	   79798 B/op	    1363 allocs/op
+BenchmarkV8_Cleanup/ReadAttributes-16         	    7287	    165801 ns/op	   83749 B/op	    1112 allocs/op
+BenchmarkV8_Cleanup/WriteAttributes-16        	    5540	    183893 ns/op	  134529 B/op	    1353 allocs/op
+BenchmarkV8_Cleanup/DomMutation-16            	    6002	    206922 ns/op	  168245 B/op	    1430 allocs/op
+BenchmarkV8_Cleanup/TreeNavigation-16         	    4051	    270388 ns/op	  154366 B/op	    2933 allocs/op
+BenchmarkV8_Cleanup/MixedRealistic-16         	    4366	    285762 ns/op	  116028 B/op	    2021 allocs/op
+BenchmarkV8_ColdStart/QuerySelectors-16       	     690	   1800595 ns/op	   84948 B/op	    1549 allocs/op
+BenchmarkV8_ColdStart/ReadAttributes-16       	     661	   1820322 ns/op	   88898 B/op	    1298 allocs/op
+BenchmarkV8_ColdStart/WriteAttributes-16      	     633	   1828372 ns/op	  139675 B/op	    1539 allocs/op
+BenchmarkV8_ColdStart/DomMutation-16          	     588	   2200729 ns/op	  173658 B/op	    1616 allocs/op
+BenchmarkV8_ColdStart/TreeNavigation-16       	     596	   1982349 ns/op	  159513 B/op	    3119 allocs/op
+BenchmarkV8_ColdStart/MixedRealistic-16       	     589	   2050183 ns/op	  121176 B/op	    2207 allocs/op
+BenchmarkV8_CleanupOnly-16                    	  659118	      1597 ns/op	     320 B/op	      11 allocs/op
+PASS

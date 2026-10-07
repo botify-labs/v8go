@@ -77,6 +77,30 @@ func BenchmarkCallGoFromJS1000(b *testing.B) {
 	}
 }
 
+// One op = 1000 JS->Go callbacks, then Context and Isolate Cleanup, timed: the
+// pattern of a gojs page. CallGoFromJS1000 cleans up every 100 ops, untimed.
+func BenchmarkCallGoFromJS1000Cleanup(b *testing.B) {
+	iso := NewIsolate()
+	defer iso.Dispose()
+	ctx := NewContextWithFuncs(iso, map[string]func(*FunctionCallbackInfo) *Value{
+		"goAdd": func(info *FunctionCallbackInfo) *Value {
+			args := info.Args()
+			v, _ := NewValue(iso, args[0].Int32()+args[1].Int32())
+			return v
+		},
+	})
+	defer ctx.Close()
+	mustRun(b, ctx, "function loop() { let s = 0; for (let i = 0; i < 1000; i++) s = goAdd(s, 1); return s }")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := globalFunc(b, ctx, "loop").Call(Undefined(iso)); err != nil {
+			b.Fatal(err)
+		}
+		ctx.Cleanup()
+		iso.Cleanup()
+	}
+}
+
 func BenchmarkNewValueString(b *testing.B) {
 	iso := NewIsolate()
 	defer iso.Dispose()
