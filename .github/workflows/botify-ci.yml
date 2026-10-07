@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   bridge-fresh:
     name: Prebuilt bridges match sources
@@ -17,6 +20,20 @@ jobs:
     - run: tools/check_bridge.sh
     - name: V8 archives carry no allocator shim
       run: tools/check_no_allocator_shim.sh
+
+  pinned-deps-fresh:
+    # Consumers don't get deps/* from this commit: MVS takes the deps modules'
+    # versions from go.mod. Those modules must carry the bridges of the current
+    # sources. After a C++ change, this fails until botify-bridge has committed
+    # the new bridges and tools/pin_deps.sh <bridge commit> is pushed (BOTIFY.md).
+    name: Pinned deps modules carry the current bridges
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - run: tools/check_pinned_deps.sh
 
   test:
     name: Tests on ${{ matrix.os }} ${{ matrix.arch }}
@@ -39,10 +56,16 @@ jobs:
     - uses: actions/setup-go@v7
       with:
         go-version: '1.27'
+    - name: The runner is the matrix platform (the committed bridge for it is the one tested)
+      run: |
+        echo "runner: $(uname -sm), Go: $(go env GOOS)_$(go env GOARCH)"
+        [ "$(go env GOOS)_$(go env GOARCH)" = "${{ matrix.os }}_${{ matrix.arch }}" ]
     - run: go work init . ./deps/${{ matrix.os }}_${{ matrix.arch }}
-    - name: Build the bridge from the current sources
-      run: tools/build_bridge.sh
-    - name: Consumer-mode tests (prebuilt bridge, system compiler, no flags)
+    # No rebuild: the consumer tests link the committed deps/<os>_<arch> bridge,
+    # the one botify-bridge built for this platform. bridge-fresh and
+    # pinned-deps-fresh check that it matches the sources; the source-mode tests
+    # below compile the C++ sources themselves.
+    - name: Consumer-mode tests (committed bridge, system compiler, no flags)
       run: CC="${{ matrix.consumer_cc }}" CGO_CXXFLAGS= go test ${{ matrix.race }} -count=1 ./...
     - name: Source-mode tests
       run: go test -tags v8go_source -count=1 ./...

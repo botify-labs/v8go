@@ -10,6 +10,7 @@
 /tools/build_bridge.sh
 /tools/bridge_hash.sh
 /tools/check_bridge.sh
+/tools/check_pinned_deps.sh
 /tools/check_no_allocator_shim.sh
 /tools/pin_deps.sh
 /tools/patches/
@@ -18,14 +19,10 @@
 /cleanup.go
 /cleanup_test.go
 /botify_*
-/compat_test.go
 /MIGRATION.md
 /BOTIFY.md
 /deps/tommie_sha
 /deps/*_*/libv8go.a
 /deps/*_*/v8go.lib
 /deps/*_*/bridge.sha256
-/.github/workflows/botify-ci.yml
-/.github/workflows/botify-bridge.yml
-/.github/workflows/botify-bench.yml
-/.github/workflows/botify-sync-upstream.yml
+/.github/workflows/botify-*.yml
