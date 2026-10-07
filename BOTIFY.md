@@ -16,6 +16,18 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   `tools/check_no_allocator_shim.sh`, qui échoue s'il reste un membre du shim ou une définition de
   `malloc`/`free`/`new`/`delete` dans une archive V8. Il faut `llvm-ar`/`llvm-ranlib`/`llvm-nm`
   (présents dans l'image Docker).
+- **Chemin JS→Go** (Task 25, `bench/results/2026-10-07-callback/callback-perf.md`) :
+  `botify_values.h` (valeurs suivies par un contexte : vecteur indexé au lieu de
+  l'`unordered_map` de tommie, libérées par adresse de handle décroissante au `Cleanup`),
+  `botify_context.h` (le `m_ctx` d'un contexte rangé dans ses *embedder data* : un callback ne
+  rappelle plus Go pour le trouver), un callback C++ sans `Locker`/`Isolate::Scope` ni `Global`
+  temporaire, et côté Go une seule allocation par appel jusqu'à 4 arguments. Le bridge en dépend :
+  un push sur upgrade-v8 qui touche `*.cc`, `*.h` ou `tools/patches/` relance `botify-bridge`.
+  Les modifications des fichiers de tommie sont des patchs,
+  `tools/patches/*.patch`, que `tools/sync_tommie.sh` applique dans l'ordre après l'import : il
+  s'arrête si l'un d'eux ne s'applique plus, en laissant appliqués les précédents. Le régénérer
+  alors contre cet état : `git add -A` (sans committer), refaire la modification à la main, puis
+  `git diff -- <fichiers modifiés> > tools/patches/<patch>`, et relancer l'import.
 - `bench/` : comparaison avec `v0.6.0-botify-baseline` (V8 9.0). `tools/docker/` : environnement de dev.
   Si `GONOSUMDB` est défini, il remplace la valeur tirée de `GOPRIVATE` : y inclure `github.com/botify-hq/*` (ex. `GONOSUMDB=github.com/botify-hq/*,github.com/botify-labs/v8go`).
 

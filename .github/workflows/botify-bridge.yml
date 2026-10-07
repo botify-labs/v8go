@@ -7,9 +7,18 @@ on:
   # GitHub only dispatches workflows that exist on the default branch, or that
   # have already run once. Until upgrade-v8 is merged, a change to this file
   # on that branch runs it (the bot commit doesn't trigger workflows).
+  # A push that changes the C++ sources, Botify's patches to tommie's files
+  # or the V8 version rebuilds the bridges too. The bridge fingerprint also
+  # covers the Go files with //export (tools/bridge_hash.sh): after a change to
+  # one of those alone, botify-ci's check_bridge fails; run this one by hand.
   push:
     branches: [upgrade-v8]
-    paths: [.github/workflows/botify-bridge.yml]
+    paths:
+    - .github/workflows/botify-bridge.yml
+    - '*.cc'
+    - '*.h'
+    - tools/patches/**
+    - deps/v8_hash
 
 jobs:
   build:
