@@ -11,7 +11,7 @@ En résumé :
   précompilées ou compilées depuis leurs sources cohabitent avec V8.
 - **Linux, lien totalement statique (`-extldflags '-static'`) : rien à faire non plus.** Le runtime
   C++ de V8 est renommé dans ses archives Linux : les libs C++ g++/libstdc++ n'entrent plus en conflit
-  avec lui (§2.2). Le prélink de liburlnorm n'est plus nécessaire.
+  avec lui (§2.2). Le prélink de liburlnorm a été retiré de cdf.
 - **Windows :** tout est lié statiquement en ABI MSVC (`/MT`). Toute lib précompilée en MinGW doit être
   recompilée en MSVC.
 
@@ -99,10 +99,11 @@ amd64 et arm64), et par gojs lié en `-static` avec la liburlnorm **d'origine** 
 
 **liburlnorm** (C++ + ICU 65, la seule lib C++ précompilée de ftl et pulse) avait été **prélinkée avec
 une libstdc++ privée** (`liburlnorm/scripts/prelink_linux.sh` dans cdf, `liburlnorm_prelinked.a`, seule
-l'API C reste globale) pour contourner ce conflit. Ce prélink **n'est plus nécessaire** : gojs se lie
-en `-static` et ses tests passent avec `-lurlnorm -licui18n -licuio -licutu -licuuc -licudata -ldl`. Il
-reste **sans danger** (sa libstdc++ est privée) et peut être gardé. Une future lib C++ n'a rien à faire
-de particulier.
+l'API C reste globale) pour contourner ce conflit. Ce prélink n'étant plus nécessaire, il a été
+**retiré** (cdf `upgrade-v8go`, commit ebbccce) : `urlnorm.go` a retrouvé la ligne `#cgo linux LDFLAGS`
+de master (`-lurlnorm -licui18n -licuio -licutu -licuuc -licudata -ldl`), et gojs se lie en `-static`
+avec ces libs d'origine. Le test `normalize_pinned_test.go` (valeurs de normalisation figées) a été
+gardé. Une future lib C++ n'a rien à faire de particulier.
 
 **Les libs C pures** (zstd, igzip/ISA-L) ne référencent aucun symbole libstdc++ : elles ne sont pas
 concernées, en dynamique comme en statique.
@@ -139,7 +140,7 @@ Un lien entièrement statique n'est pas concerné.
 | C compilé depuis les sources | OK | OK |
 | C précompilé (`.a`) | OK | OK |
 | C++ compilé depuis les sources avec g++ | OK | OK (runtime C++ de V8 renommé, §2.2) |
-| C++ précompilé avec g++/libstdc++ | OK | OK (un prélink comme celui de liburlnorm n'est plus nécessaire) |
+| C++ précompilé avec g++/libstdc++ | OK | OK (pas de prélink : celui de liburlnorm a été retiré) |
 
 macOS n'a pas de lien totalement statique : la ligne de droite ne s'y applique pas.
 
@@ -167,9 +168,9 @@ Ce qui a été recompilé (voir `docs/superpowers/cgo-inventory.md`) :
 
 | Lib | Dépôt | Résultat | Remarques |
 |---|---|---|---|
-| liburlnorm + ICU 65 | cdf | `liburlnorm/go/urlnorm/lib/windows_msvc/` (`urlnorm.lib`, `sicu{uc,in,io,tu,dt}.lib`) | ICU 65 conservée (normalisation identique à la production) ; workflow `windows-msvc-libs.yml` ; C++ (`libcpmt`) |
+| liburlnorm + ICU 65 | cdf | `liburlnorm/go/urlnorm/lib/windows_msvc/` (`urlnorm.lib`, `sicu{uc,in,io,tu,dt}.lib`) | ICU 65 conservée (normalisation identique à la production), compilée par clang-cl comme liburlnorm (avec cl, ~10 % plus lent que MinGW) ; workflow `windows-msvc-libs.yml` ; C++ (`libcpmt`) |
 | igzip (ISA-L) | cdf et pulse | `go/pkg/igzip/lib/windows/igzip.lib` dans chaque dépôt | ISA-L 2.31.1 (cdf) et 2.30.0 (pulse) ; assemblé avec NASM |
-| zstd | gocdf | `compress/zstd/lib/zstd_windows.lib` (PR #926) | zstd 1.5.0, clang-cl, build reproductible ; à publier dans une version de gocdf |
+| zstd | gocdf | `compress/zstd/lib/zstd_windows.lib` (PR #926) | zstd 1.5.0, clang-cl avec `-fgnuc-version` (sinon les chemins BMI2 du décodeur sont compilés sans BMI2 : décompression ~17 % plus lente ; le workflow le vérifie), build reproductible ; à publier dans une version de gocdf |
 
 Dans chaque cas, un workflow construit la lib sur un runner Windows, vérifie les symboles et le CRT,
 puis exécute `go test` avec `CC="clang -fuse-ld=lld"`, d'abord contre la `.lib` commitée, puis contre
@@ -249,8 +250,9 @@ Une lib sans directive (données seules, comme `sicudt.lib`) est normale.
 - **C précompilé, Windows** : construire un `.lib` `/MT` (clang-cl ou `cl /MT`), le placer à côté du
   `.a`, ajouter un workflow Windows qui teste la lib committée puis une reconstruction, comme pour
   zstd et igzip.
-- **C++, lien statique Linux** : rien à faire (§2.2). Le prélink de liburlnorm (`prelink_linux.sh`)
-  reste une option pour masquer les symboles d'une lib, il n'est plus requis pour cohabiter avec V8.
+- **C++, lien statique Linux** : rien à faire (§2.2). Le prélink qu'avait liburlnorm
+  (`prelink_linux.sh`, retiré de cdf, voir son historique) reste une technique possible pour masquer
+  les symboles d'une lib, mais n'est plus requis pour cohabiter avec V8.
 - **C++ Windows** : reconstruire en `/MT` avec clang-cl (liburlnorm + ICU 65 en est l'exemple ; vérifier
   l'absence de symboles `_7x` si l'ICU est dupliquée avec celle de V8, qui utilise le suffixe `_78`).
 - **Plusieurs ICU** : l'ICU de V8 (suffixe `_78`) et celle de liburlnorm (`_65`) coexistent grâce à ces
@@ -315,7 +317,8 @@ Windows (§5.1) couvre ce besoin.
 
 ## 6. Isolation du runtime C++ de V8 (implémentée)
 
-Le conflit statique de §2.2 était résolu **dépendance par dépendance** (prélink de liburlnorm, côté cdf).
+Le conflit statique de §2.2 était résolu **dépendance par dépendance** (prélink de liburlnorm, côté cdf,
+depuis retiré).
 Il est désormais éliminé pour **toutes** les dépendances C++, dans v8go lui-même, sur Linux.
 
 La piste initiale était de prélinker en un seul objet le bridge, V8 et libc++/libc++abi, en
