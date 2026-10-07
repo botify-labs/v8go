@@ -45,6 +45,8 @@ Pour gojs, c'est le seul changement : l'import. Le reste du code n'a pas bougé.
     - zstd de gocdf : `zstd_windows.lib` à côté de `libzstd_windows.a` (via une PR sur gocdf).
   - Avec clang ciblant MSVC, `-lfoo` résout `foo.lib` : les `.lib` MSVC peuvent coexister avec les
     `.a` MinGW sans changer les LDFLAGS.
+- **Autres dépendances cgo** (pourquoi liburlnorm, zstd et igzip ont dû être recompilées, et comment
+  traiter une nouvelle lib) : voir `CGO-DEPENDENCIES.md`.
 - **Développer v8go lui-même** : `-tags v8go_source`, clang ≥ 21, `CGO_CXXFLAGS=-nostdinc++`.
   Voir `BOTIFY.md`.
 

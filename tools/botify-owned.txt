@@ -21,6 +21,7 @@
 /botify_*
 /MIGRATION.md
 /BOTIFY.md
+/CGO-DEPENDENCIES.md
 /deps/tommie_sha
 /deps/*_*/libv8go.a
 /deps/*_*/v8go.lib

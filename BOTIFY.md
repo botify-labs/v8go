@@ -61,6 +61,7 @@ Mettre à jour V8 :
    `tools/pin_deps.sh <commit tagué>` (qui résout alors les tags), pousser, puis tagger le module racine.
 
 Benchmarks : `tools/docker/dev.sh bench/run.sh`. Migration des consommateurs : `MIGRATION.md`.
+Dépendances cgo des consommateurs (liburlnorm, zstd, igzip…) et nouvelles libs : `CGO-DEPENDENCIES.md`.
 
 ## Piège clang-format
 
