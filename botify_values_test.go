@@ -159,4 +159,27 @@ func TestGoValueWeakCallbacksAfterIdsMoved(t *testing.T) {
 		t.Fatalf("%d internal values after Cleanup, expected at least the %d owners", kept, n)
 	}
 	collect(kept - n)
+
+	// The same through a Cleanup of more values than kSortReleased
+	// (botify_values.h), which takes the path that releases them by handle
+	// address. The owners come after thousands of released values: they all
+	// get new ids. A stale id would leave a deleted owner tracked, which
+	// collect reports, and Dispose would then crash on.
+	pad := func() {
+		t.Helper()
+		for i := 0; i < 17000; i++ {
+			if _, err := v8.NewValue(iso, int32(i)); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	pad()
+	newValues()
+	pad()
+	iso.Cleanup()
+	kept = iso.InternalRetainedValueCount()
+	if kept < n {
+		t.Fatalf("%d internal values after a large Cleanup, expected at least the %d owners", kept, n)
+	}
+	collect(kept - n)
 }
