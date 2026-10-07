@@ -1,8 +1,6 @@
 name: Botify Bench
 
 on:
-  # TEMPORARY: runs the workflow from this branch before it exists on master.
-  push: { branches: [upgrade-v8], paths: [.github/workflows/botify-bench.yml] }
   workflow_dispatch:
     inputs:
       count:
@@ -35,10 +33,10 @@ jobs:
         go-version: '1.27'
     - name: Baseline
       working-directory: v8go/bench
-      run: GOWORK=off go test -tags v8baseline -run '^$' -bench . -benchmem -count ${{ inputs.count || '10' }} -timeout 4h . | tee baseline.txt
+      run: GOWORK=off go test -tags v8baseline -run '^$' -bench . -benchmem -count ${{ inputs.count }} -timeout 4h . | tee baseline.txt
     - name: New
       working-directory: v8go/bench
-      run: GOWORK=off go test -run '^$' -bench . -benchmem -count ${{ inputs.count || '10' }} -timeout 4h . | tee new.txt
+      run: GOWORK=off go test -run '^$' -bench . -benchmem -count ${{ inputs.count }} -timeout 4h . | tee new.txt
     - name: Compare
       working-directory: v8go/bench
       run: |
@@ -75,7 +73,7 @@ jobs:
       working-directory: v8go/bench
       run: |
         mkdir -p ../../v8go-baseline && printf 'module rogchap.com/v8go\n\ngo 1.16\n' >../../v8go-baseline/go.mod
-        CC="${{ matrix.cc }}" GOWORK=off go test -run '^$' -bench . -benchmem -count ${{ inputs.count || '10' }} -timeout 4h . | tee new.txt
+        CC="${{ matrix.cc }}" GOWORK=off go test -run '^$' -bench . -benchmem -count ${{ inputs.count }} -timeout 4h . | tee new.txt
         cat new.txt >>"$GITHUB_STEP_SUMMARY"
     - uses: actions/upload-artifact@v4
       with:
