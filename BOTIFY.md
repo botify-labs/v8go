@@ -32,17 +32,41 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
 - `bench/` : comparaison avec `v0.6.0-botify-baseline` (V8 9.0). `tools/docker/` : environnement de dev.
   Si `GONOSUMDB` est défini, il remplace la valeur tirée de `GOPRIVATE` : y inclure `github.com/botify-hq/*` (ex. `GONOSUMDB=github.com/botify-hq/*,github.com/botify-labs/v8go`).
 
+Bridges et pins des modules `deps/*` : un consommateur ne prend pas `deps/<os>_<arch>` dans le commit
+de v8go qu'il requiert, mais dans les versions des modules `deps/*` que le `go.mod` de v8go épingle
+(MVS). botify-ci vérifie les deux :
+- `bridge-fresh` (`tools/check_bridge.sh`) : les bridges de ce commit correspondent aux sources ;
+- `pinned-deps-fresh` (`tools/check_pinned_deps.sh`) : les modules `deps/*` épinglés par `go.mod`
+  portent un `bridge.sha256` égal à `tools/bridge_hash.sh`, et `bench/go.mod` épingle les mêmes
+  versions.
+
+Après toute modification de ce qu'empreinte `tools/bridge_hash.sh` (C++, patchs, `//export`, V8) :
+1. pousser. `botify-bridge` reconstruit les bridges (seul pour `*.cc`, `*.h`, `tools/patches/` et
+   `deps/v8_hash` sur upgrade-v8, sinon le lancer à la main) et pousse un commit
+   « Rebuild prebuilt v8go bridges ». D'ici là, `bridge-fresh` et `pinned-deps-fresh` échouent :
+   c'est voulu ;
+2. `git pull`, puis `tools/docker/dev.sh 'tools/pin_deps.sh <sha du commit de bridges>'` ; committer
+   `go.mod`, `go.sum` et `bench/go.mod`, et pousser ;
+3. ce push relance `botify-ci` (le commit du bot n'en déclenche pas) : le commit de pin ne change pas
+   le C++, donc `pinned-deps-fresh` passe.
+
+Un pin est obligatoire après chaque reconstruction des bridges, avant de tagger ou de fusionner.
+
 Mettre à jour V8 :
 1. lancer `tools/docker/dev.sh 'tools/sync_tommie.sh <sha>'` (ou le workflow `botify-sync-upstream`) ;
-2. lancer le workflow `botify-bridge` sur la branche ;
-3. vérifier que `botify-ci` passe ;
-4. fusionner, puis lancer `tools/pin_deps.sh <sha poussé>`.
+2. lancer le workflow `botify-bridge` sur la branche, puis épingler (`tools/pin_deps.sh`, ci-dessus) ;
+3. vérifier que `botify-ci` passe, `pinned-deps-fresh` compris ;
+4. fusionner par un *merge commit* (pas de squash ni de rebase : `go.mod` référence des commits de
+   la branche). Pour une version : tagger les modules `deps/*` sur ce commit, lancer
+   `tools/pin_deps.sh <commit tagué>` (qui résout alors les tags), pousser, puis tagger le module racine.
 
 Benchmarks : `tools/docker/dev.sh bench/run.sh`. Migration des consommateurs : `MIGRATION.md`.
 
 ## Piège clang-format
 
 `clang-format` réécrit la première ligne `//go:build v8go_source` des fichiers `.cc` en
-`// go:build v8go_source`. Le tag de build est alors ignoré **sans erreur** : les `.cc` sont compilés
-dans le build normal, ou disparaissent du build `-tags v8go_source`. Après tout formatage, vérifier
-la ligne 1 de chaque `.cc` (`head -1 *.cc`) : elle doit être exactement `//go:build v8go_source`.
+`// go:build v8go_source`. La contrainte de build est alors ignorée **sans erreur** : les `.cc` sont
+compilés dans tous les builds, y compris ceux des consommateurs (sans clang ≥ 21 ni `-nostdinc++`,
+qui échouent alors). `tools/sync_tommie.sh` place donc la contrainte entre des marqueurs
+`// clang-format off` / `// clang-format on`. Après tout formatage, vérifier les lignes 1 à 3 de
+chaque `.cc` (`head -3 *.cc`) : la ligne 2 doit être exactement `//go:build v8go_source`.
