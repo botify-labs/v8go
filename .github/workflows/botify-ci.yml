@@ -15,11 +15,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v7
-    - name: Install llvm (llvm-ar and llvm-nm for the allocator shim check)
+    - name: Install llvm (llvm-ar and llvm-nm for the archive checks)
       run: sudo apt-get update && sudo apt-get install -y llvm
     - run: tools/check_bridge.sh
     - name: V8 archives carry no allocator shim
       run: tools/check_no_allocator_shim.sh
+    - name: V8's C++ runtime is renamed in the Linux archives (no clash with libstdc++)
+      run: tools/check_cxx_runtime_isolated.sh
 
   pinned-deps-fresh:
     # Consumers don't get deps/* from this commit: MVS takes the deps modules'
@@ -71,6 +73,43 @@ jobs:
       run: go test -tags v8go_source -count=1 ./...
       env:
         CGO_CXXFLAGS: "-nostdinc++"
+
+  static-cxx-probe:
+    # A consumer binary linked fully statically with v8go and g++-built C++
+    # (libstdc++.a): V8's C++ runtime is renamed in the Linux archives
+    # (tools/cxx-runtime-rename.map), so the two runtimes don't clash, and each
+    # one's exceptions and RTTI keep working (internal/cxxprobe).
+    name: Fully static binary with g++ C++ code on linux ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - { arch: amd64, platform: ubuntu-24.04 }
+        - { arch: arm64, platform: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.platform }}
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - run: go work init . ./deps/linux_${{ matrix.arch }}
+    - name: Fully static link (gcc, g++, libstdc++.a, no flags)
+      run: |
+        CC=gcc CXX=g++ CGO_CXXFLAGS= go test -c -o cxxprobe.test -tags 'netgo osusergo cxxprobe' \
+          -ldflags "-linkmode external -extldflags '-static -lm'" ./internal/cxxprobe
+    - name: The binary is static and holds both C++ runtimes
+      run: |
+        file cxxprobe.test
+        if readelf -lW cxxprobe.test | grep -q INTERP; then echo "cxxprobe.test is dynamic" >&2; exit 1; fi
+        for s in __cxa_throw __gxx_personality_v0 _ZTISt9exception; do
+          nm cxxprobe.test | grep -qE " $s\$" || { echo "missing libstdc++'s $s" >&2; exit 1; }
+          nm cxxprobe.test | grep -qE " $s\.v8cr\$" || { echo "missing V8's $s.v8cr" >&2; exit 1; }
+        done
+    - name: Run it
+      run: ./cxxprobe.test -test.v -test.count=1
+    - name: Dynamic link (libstdc++.so)
+      run: CC=gcc CXX=g++ CGO_CXXFLAGS= go test -count=1 -v -tags cxxprobe ./internal/cxxprobe
+
 
   glibc-floor:
     # Our oldest Linux runtime is Amazon Linux 2023 (glibc 2.34). The linker
