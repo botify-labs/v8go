@@ -29,12 +29,16 @@ Pour gojs, c'est le seul changement : l'import. Le reste du code n'a pas bougé.
   botify-ci), ou vérifier le binaire :
   `objdump -T <binaire> | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1` doit afficher au plus
   `GLIBC_2.34`. Un lien entièrement statique n'est pas concerné.
-- **Linux, lien totalement statique** (`-extldflags '-static'`) : toute lib C++ précompilée avec
-  g++/libstdc++ liée avec V8 dans un binaire entièrement statique doit être « prélinkée » avec sa
-  propre libstdc++ privée, sinon elle entre en conflit avec le libstdc++ de V8. liburlnorm (cdf) est
-  déjà traitée : elle fournit `lib/linux/liburlnorm_prelinked.a` (voir `liburlnorm/scripts/prelink_linux.sh`
-  dans cdf). Toute autre lib du même type doit suivre la même procédure. Les liens dynamiques ne sont
-  pas concernés.
+- **Linux, lien totalement statique** (`-extldflags '-static'`) : fonctionne, y compris avec des libs
+  C++ construites avec g++/libstdc++ (précompilées ou compilées depuis leurs sources). Le runtime C++
+  de V8 (libc++ et libc++abi de Chromium) est renommé dans les archives Linux (suffixe `.v8cr`) : il
+  ne définit plus aucun des symboles de libstdc++/libsupc++ (`__cxa_*`, `std::exception`,
+  `operator new`…), chaque runtime garde ses exceptions et son RTTI, sans coût à l'exécution. Le
+  prélink de liburlnorm (`lib/linux/liburlnorm_prelinked.a`, cdf) n'est donc plus nécessaire ; il
+  reste sans danger. Une nouvelle lib C++ n'a rien à faire. Voir `CGO-DEPENDENCIES.md` §2.2.
+- **Linux, lien dynamique avec du C++ g++** : le même renommage corrige un défaut des versions
+  précédentes de cette branche : le runtime de V8, lié dans l'exécutable, supplantait celui de
+  `libstdc++.so`, et une exception levée dans libstdc++ (`std::stoi`…) finissait en `std::terminate`.
 - **Windows amd64** : tout est statique en ABI MSVC.
   - Go ≥ 1.27, LLVM ≥ 21 (`choco install llvm`), MSVC Build Tools + Windows SDK ;
   - `CC="clang -fuse-ld=lld"` et `CXX="clang++ -fuse-ld=lld"` ;

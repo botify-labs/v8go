@@ -16,13 +16,41 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   `tools/check_no_allocator_shim.sh`, qui échoue s'il reste un membre du shim ou une définition de
   `malloc`/`free`/`new`/`delete` dans une archive V8. Il faut `llvm-ar`/`llvm-ranlib`/`llvm-nm`
   (présents dans l'image Docker).
+- **Runtime C++ de V8 isolé (Linux)** : libc++abi et libc++ de Chromium définissent la couche ABI C++
+  (`__cxa_*`, `__gxx_personality_v0`, `std::exception` et les autres exceptions `std::`, leurs
+  typeinfo et vtables, `__dynamic_cast`, `std::terminate`, `operator new`/`delete`…) sous les mêmes
+  noms que libstdc++/libsupc++. Sans isolation, un binaire entièrement statique qui lie aussi du C++
+  g++ échoue (`multiple definition`), et en dynamique le runtime de V8 supplante celui de
+  `libstdc++.so` (une exception levée dans libstdc++, `std::stoi` par exemple, finit en
+  `std::terminate`). Après le retrait du shim, `tools/sync_tommie.sh` :
+  1. génère `tools/cxx-runtime-rename.map` avec `tools/gen_cxx_runtime_rename_map.sh` : tout symbole
+     global défini par `libc++-cr.a`/`libc++abi-cr.a` hors des namespaces privés `__Cr` et
+     `__llvm_libc_cr` (499 symboles), qui reçoit le suffixe `.v8cr` (`c++filt` affiche
+     `typeinfo for std::exception [clone .v8cr]`) ;
+  2. l'applique avec `tools/rename_cxx_runtime.sh` (`objcopy --redefine-syms`, idempotent) aux
+     archives V8, libc++, compiler-rt et aux bridges de `deps/linux_*`, définitions et références :
+     le groupe COMDAT `DW.ref.__gxx_personality_v0`, par lequel les CIE de `.eh_frame` atteignent la
+     routine de personnalité, est renommé aussi. `_Unwind_*` (l'unwinder de libgcc, partagé) et la
+     libc ne sont pas touchés ;
+  3. termine par `tools/check_cxx_runtime_isolated.sh`, qui échoue si une archive Linux définit ou
+     référence encore un nom d'origine, ou si la table et les alias ne sont pas ceux que le script
+     génère.
+
+  `tools/build_bridge.sh` renomme de même les bridges Linux, et la table entre dans
+  `tools/bridge_hash.sh`. Mode source : les objets compilés par cgo référencent les noms d'origine ;
+  `deps/linux_*/libv8go_cxxalias.a` (un script d'édition de liens généré, lié avant les archives en
+  mode source seulement) les définit comme alias des noms renommés (`EXTERN` + `PROVIDE`), et
+  `botify_cxxalias_linux.go` redirige `operator new`/`delete` par `--wrap`, pour qu'ils restent ceux
+  de V8 même à côté de ceux d'ASan (`-tags leakcheck`). Preuve : `internal/cxxprobe` (C++ g++ lié avec
+  v8go, tag `cxxprobe`), exécuté en lien entièrement statique par le job `static-cxx-probe`.
 - **Chemin JS→Go** (Task 25, `bench/results/2026-10-07-callback/callback-perf.md`) :
   `botify_values.h` (valeurs suivies par un contexte : vecteur indexé au lieu de
   l'`unordered_map` de tommie, libérées par adresse de handle décroissante au `Cleanup`),
   `botify_context.h` (le `m_ctx` d'un contexte rangé dans ses *embedder data* : un callback ne
   rappelle plus Go pour le trouver), un callback C++ sans `Locker`/`Isolate::Scope` ni `Global`
   temporaire, et côté Go une seule allocation par appel jusqu'à 4 arguments. Le bridge en dépend :
-  un push sur upgrade-v8 qui touche `*.cc`, `*.h`, `tools/patches/` ou `deps/v8_hash` relance
+  un push sur upgrade-v8 qui touche `*.cc`, `*.h`, `tools/patches/`, `deps/v8_hash` ou la table de
+  renommage du runtime C++ relance
   `botify-bridge` (pas un `.go` à `//export` seul : `check_bridge` le signale, lancer le workflow à la main).
   Les modifications des fichiers de tommie sont des patchs,
   `tools/patches/*.patch`, que `tools/sync_tommie.sh` applique dans l'ordre après l'import : il
@@ -36,12 +64,15 @@ Bridges et pins des modules `deps/*` : un consommateur ne prend pas `deps/<os>_<
 de v8go qu'il requiert, mais dans les versions des modules `deps/*` que le `go.mod` de v8go épingle
 (MVS). botify-ci vérifie les deux :
 - `bridge-fresh` (`tools/check_bridge.sh`) : les bridges de ce commit correspondent aux sources ;
+  le même job vérifie l'absence du shim et l'isolation du runtime C++ (`tools/check_cxx_runtime_isolated.sh`) ;
 - `pinned-deps-fresh` (`tools/check_pinned_deps.sh`) : les modules `deps/*` épinglés par `go.mod`
   portent un `bridge.sha256` égal à `tools/bridge_hash.sh`, et `bench/go.mod` épingle les mêmes
   versions.
 
-Après toute modification de ce qu'empreinte `tools/bridge_hash.sh` (C++, patchs, `//export`, V8) :
-1. pousser. `botify-bridge` reconstruit les bridges (seul pour `*.cc`, `*.h`, `tools/patches/` et
+Après toute modification de ce qu'empreinte `tools/bridge_hash.sh` (C++, patchs, `//export`, V8,
+table de renommage du runtime C++) :
+1. pousser. `botify-bridge` reconstruit les bridges (seul pour `*.cc`, `*.h`, `tools/patches/`,
+   `tools/cxx-runtime-rename.map`, ses scripts et
    `deps/v8_hash` sur upgrade-v8, sinon le lancer à la main) et pousse un commit
    « Rebuild prebuilt v8go bridges ». D'ici là, `bridge-fresh` et `pinned-deps-fresh` échouent :
    c'est voulu ;
@@ -53,7 +84,9 @@ Après toute modification de ce qu'empreinte `tools/bridge_hash.sh` (C++, patchs
 Un pin est obligatoire après chaque reconstruction des bridges, avant de tagger ou de fusionner.
 
 Mettre à jour V8 :
-1. lancer `tools/docker/dev.sh 'tools/sync_tommie.sh <sha>'` (ou le workflow `botify-sync-upstream`) ;
+1. lancer `tools/docker/dev.sh 'tools/sync_tommie.sh <sha>'` (ou le workflow `botify-sync-upstream`) ; il
+   retire le shim, renomme le runtime C++ des archives Linux (table régénérée : committer son diff avec
+   les archives) et finit par `tools/check_cxx_runtime_isolated.sh` ;
 2. lancer le workflow `botify-bridge` sur la branche, puis épingler (`tools/pin_deps.sh`, ci-dessus) ;
 3. vérifier que `botify-ci` passe, `pinned-deps-fresh` compris ;
 4. fusionner par un *merge commit* (pas de squash ni de rebase : `go.mod` référence des commits de

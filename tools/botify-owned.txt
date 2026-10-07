@@ -32,4 +32,4 @@
 /tools/check_cxx_runtime_isolated.sh
 /tools/cxx-runtime-rename.map
 /deps/linux_*/libv8go_cxxalias.a
-/internal/cxxprobe/
+/internal/

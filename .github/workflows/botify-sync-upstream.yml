@@ -37,7 +37,7 @@ jobs:
       if: steps.check.outputs.skip != 'true'
       with:
         go-version: '1.27'
-    - name: Install llvm (llvm-ar, llvm-ranlib and llvm-nm strip the allocator shim)
+    - name: Install llvm (llvm-ar, llvm-ranlib, llvm-nm and llvm-objcopy strip the allocator shim and rename the C++ runtime)
       if: steps.check.outputs.skip != 'true'
       run: sudo apt-get update && sudo apt-get install -y llvm
     - name: Import
