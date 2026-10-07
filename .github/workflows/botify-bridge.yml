@@ -20,6 +20,9 @@ on:
     - tools/patches/**
     - deps/v8_hash
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Bridge ${{ matrix.os }}_${{ matrix.arch }}
@@ -70,7 +73,7 @@ jobs:
           cp "$d"/* "deps/${d#artifacts/bridge-}/"
         done
         tools/check_bridge.sh
-    - uses: stefanzweifel/git-auto-commit-action@v5
+    - uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
       with:
         commit_message: Rebuild prebuilt v8go bridges
         file_pattern: deps/*/libv8go.a deps/*/v8go.lib deps/*/bridge.sha256
