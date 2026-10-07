@@ -65,6 +65,15 @@ Pour gojs, c'est le seul changement : l'import. Le reste du code n'a pas bougé.
   de la glibc (ou du système : zone par défaut sous macOS, UCRT sous Windows) reste donc en place
   pour tout le code C/C++ du consommateur (cgo, liburlnorm, zstd, igzip…), comme avec la baseline.
   `tools/check_no_allocator_shim.sh` le vérifie.
+- Chemin JS→Go (Task 25, `bench/results/2026-10-07-callback/callback-perf.md`) :
+  - fermer un `Context` (`Close`) **avant** de disposer son `Isolate` : un `Close` après `Dispose`,
+    déjà invalide, prend maintenant le verrou d'un isolate libéré (comportement indéfini, en
+    pratique plutôt un plantage qu'une corruption silencieuse) ;
+  - pas de `runtime.SetFinalizer` sur les valeurs d'un callback (`info.Args()[i]`, `info.This()`) :
+    jusqu'à 4 arguments, ce sont des pointeurs intérieurs d'un bloc alloué par appel, et le runtime
+    Go refuse le finaliseur ;
+  - `Context.Close` prend le verrou de l'isolate : ne pas l'appeler depuis une goroutine qu'un
+    callback en cours (JS en cours d'exécution sur cet isolate) attend, sous peine d'interblocage.
 
 ## 4. Changements d'API
 

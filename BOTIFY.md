@@ -22,7 +22,8 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   `botify_context.h` (le `m_ctx` d'un contexte rangé dans ses *embedder data* : un callback ne
   rappelle plus Go pour le trouver), un callback C++ sans `Locker`/`Isolate::Scope` ni `Global`
   temporaire, et côté Go une seule allocation par appel jusqu'à 4 arguments. Le bridge en dépend :
-  un push sur upgrade-v8 qui touche `*.cc`, `*.h` ou `tools/patches/` relance `botify-bridge`.
+  un push sur upgrade-v8 qui touche `*.cc`, `*.h`, `tools/patches/` ou `deps/v8_hash` relance
+  `botify-bridge` (pas un `.go` à `//export` seul : `check_bridge` le signale, lancer le workflow à la main).
   Les modifications des fichiers de tommie sont des patchs,
   `tools/patches/*.patch`, que `tools/sync_tommie.sh` applique dans l'ordre après l'import : il
   s'arrête si l'un d'eux ne s'applique plus, en laissant appliqués les précédents. Le régénérer
