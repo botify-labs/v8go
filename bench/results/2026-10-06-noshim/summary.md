@@ -227,3 +227,35 @@ CallJSFromGo (+2.8 %) et ValueToGoString (+2.6 %) restent sous le seuil de 5 %.
 - **gojs V8_Cleanup/*** : au niveau de la baseline (-4.6 % à +3.6 %, QuerySelectors n.s.). **V8_ColdStart/*** : -12.5 à -14.2 %.
 
 Les preuves brutes de l'analyse du shim (strace, défauts de page, callgrind) sont dans le rapport de la Task 14. Le retrait lui-même (inventaire des 5 plateformes, méthode) est décrit dans le rapport de la Task 24 (`.superpowers/sdd/2026-10-06-v8-upgrade/task-24-report.md`).
+
+## Autres plateformes (CI GitHub, run 37578680646, COUNT=10)
+
+Workflow `Botify Bench` (`.github/workflows/botify-bench.yml`), lancé sur `upgrade-v8` (a967705, qui ajoutait un déclencheur `push` temporaire car `workflow_dispatch` répond 404 tant que le workflow n'est pas sur master ; retiré ensuite par 20bde47). Même suite `bench/` que ci-dessus, nouvelle version compilée comme chez un consommateur (bridge précompilé), baseline = tag `v0.6.0-botify-baseline`. Sorties brutes et `benchstat` dans `ci/` (`bench-<plateforme>/*.txt`, `benchstat-<plateforme>.txt`).
+
+**Ce sont des runners GitHub partagés (VM)** : beaucoup plus bruités que la machine de la campagne principale (écarts-types jusqu'à ±18 % sur l'Intel, ±86 % à ±181 % sur JSObjects). Les chiffres par benchmark sont à lire comme des ordres de grandeur ; seul le geomean est stable. Les runners ont 3 à 4 CPU, d'où le suffixe `-3` / `-4`.
+
+| Plateforme | Runner | Baseline | geomean sec/op (new vs baseline) |
+|---|---|---|---|
+| darwin arm64 | macos-15, Apple M1 (VM), 3 CPU | oui | 136.0 µs → 127.9 µs, **-5.98 %** |
+| darwin amd64 | macos-15-intel, i7-8700B, 4 CPU | oui | 381.2 µs → 336.4 µs, **-11.75 %** |
+| linux arm64 | ubuntu-24.04-arm, 4 CPU | non (pas de lib V8 9.0) | 172.6 µs (nouvelle version seule) |
+| windows amd64 | windows-latest, AMD EPYC 9V45, 4 CPU, clang + lld, MSVC statique | non | 124.0 µs (nouvelle version seule) |
+
+Aucune comparaison avec la baseline n'est possible sur linux arm64 et Windows : la baseline V8 9.0 n'a pas de bibliothèque pour ces cibles. Les mesures servent de référence pour les prochains runs.
+
+### Régressions > 5 % (p < 0.05) par rapport à la baseline
+
+**darwin arm64** (toutes les autres lignes sont stables ou en gain, par ex. NewIsolate -42.9 %, JSONParse -61.4 %) :
+- Cleanup1000Values **+96.4 %** : le coût voulu du correctif `Cleanup` (voir plus haut), +123.8 % sur linux amd64.
+- JSObjects **+708.8 % (±86 %)** : le benchmark est bimodal en new, à cause d'un GC majeur pendant certains échantillons (voir Task 14). Non confirmé comme régression structurelle.
+- CallGoFromJS1000 **+7.8 %** (+20.9 % sur linux amd64).
+- HeapPerContext **+21.8 %** (+26.5 % sur linux amd64, V8 15 alloue davantage par contexte).
+
+**darwin amd64** (runner le plus bruité ; plusieurs lignes à ±18 % à ±36 % en baseline) :
+- Cleanup1000Values **+121.6 %** : même cause.
+- CompileLodashCold **+35.2 %** (±18 % en new) et CompileLodashWithCodeCache **+30.6 %** : à l'inverse de linux amd64 (-8.1 % et -11.9 %) et de darwin arm64 (-20 %). **Non expliqué** ; la Task 14 avait déjà vu ces deux benchmarks +20 % sur linux amd64 avec le shim, puis plus rien sans le shim. À re-mesurer sur une machine non partagée avant de conclure.
+- JSObjects **+54.9 % (±181 %)** : bimodal, comme ci-dessus.
+- HeapPerContext **+34.5 %**, HeapPerIsolate **+6.2 %**, JSJSON **+5.6 %**.
+- CallGoFromJS1000 : pas de différence significative (~, p=0.68).
+
+Gains sur les deux plateformes macOS : NewIsolate -43 % / -49 %, RunScriptTrivial -11 % / -46 %, JSONParse -61 % / -63 %, JSONStringify -59 % / -51 %, ObjectSetGet -26 % / -27 %.
