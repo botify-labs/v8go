@@ -6,6 +6,7 @@
 #include "_cgo_export.h"
 #include "deps/include/v8-template.h"
 
+#include "botify_context.h"
 #include "context-macros.h"
 #include "template.h"
 #include "unbound_script.h"
@@ -38,6 +39,7 @@ ContextPtr NewContext(IsolatePtr iso,
   m_ctx* ctx = new m_ctx;
   ctx->ptr.Reset(iso, local_ctx);
   ctx->iso = iso;
+  BotifyContextSet(local_ctx, ctx);
   return ctx;
 }
 
@@ -45,6 +47,7 @@ void ContextFree(ContextPtr ctx) {
   if (ctx == nullptr) {
     return;
   }
+  BotifyContextForget(ctx);
   ctx->ptr.Reset();
 
   for (m_value* value : ctx->vals) {

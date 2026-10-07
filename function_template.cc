@@ -4,6 +4,7 @@
 
 #include "_cgo_export.h"
 
+#include "botify_context.h"
 #include "deps/include/v8-context.h"
 #include "deps/include/v8-function.h"
 #include "isolate-macros.h"
@@ -23,7 +24,11 @@ void FunctionTemplateCallback(const FunctionCallbackInfo<Value>& info) {
   int ctx_ref = local_ctx->GetEmbedderDataV2(ContextDataIndex::REF)
                     .As<Integer>()
                     ->Value();
-  m_ctx* ctx = goContext(ctx_ref);
+  // Botify: found without a call into Go, unless the Context is closed.
+  m_ctx* ctx = BotifyContextGet(iso, local_ctx);
+  if (ctx == nullptr) {
+    ctx = goContext(ctx_ref);
+  }
 
   int callback_ref = info.Data().As<Integer>()->Value();
 
