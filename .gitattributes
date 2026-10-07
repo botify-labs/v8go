@@ -3,3 +3,5 @@
 *.lib binary
 *.png binary
 *.jpg binary
+# Patches keep their context lines' single space: no whitespace checks.
+tools/patches/*.patch -whitespace

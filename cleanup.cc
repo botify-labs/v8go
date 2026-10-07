@@ -53,16 +53,11 @@ void ContextCleanup(ContextPtr ctx) {
   // Weak owners of Go values (go_handle != 0, see NewValueGo) stay tracked:
   // JS may still reference their External, and GoValueWeakCallback releases
   // them, and their cgo.Handle, when V8 collects it.
-  for (auto it = ctx->vals.begin(); it != ctx->vals.end();) {
-    m_value* val = it->second;
-    if (val->go_handle != 0) {
-      ++it;
-      continue;
-    }
-    val->ptr.Reset();
-    delete val;
-    it = ctx->vals.erase(it);
-  }
+  ctx->vals.release_if([](m_value* val) { return val->go_handle != 0; },
+                       [](m_value* val) {
+                         val->ptr.Reset();
+                         delete val;
+                       });
 
   for (m_unboundScript* us : ctx->unboundScripts) {
     us->ptr.Reset();

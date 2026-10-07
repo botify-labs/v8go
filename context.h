@@ -8,8 +8,8 @@
 
 #include "deps/include/v8-persistent-handle.h"
 
-#include <unordered_map>
 #include <vector>
+#include "botify_values.h"
 #include "value.h"
 
 namespace v8 {
@@ -32,10 +32,9 @@ enum ContextDataIndex {
 
 struct m_ctx {
   v8::Isolate* iso;
-  std::unordered_map<long, m_value*> vals;
+  ValueTracker vals;
   std::vector<m_unboundScript*> unboundScripts;
   v8::Persistent<v8::Context> ptr;
-  long nextValId = 0;
 };
 typedef m_ctx* ContextPtr;
 

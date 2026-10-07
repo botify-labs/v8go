@@ -12,11 +12,12 @@
 /tools/check_bridge.sh
 /tools/check_no_allocator_shim.sh
 /tools/pin_deps.sh
+/tools/patches/
 /cleanup.h
 /cleanup.cc
 /cleanup.go
 /cleanup_test.go
-/botify_export_test.go
+/botify_*
 /compat_test.go
 /MIGRATION.md
 /BOTIFY.md

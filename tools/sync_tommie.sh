@@ -57,6 +57,17 @@ for f in deps/*_*/cgo.go; do
   sed -i '/^\/\/ #cgo LDFLAGS: .*-lv8-0 /a // #cgo linux,!v8go_source LDFLAGS: -lm' "$f"
 done
 
+# Botify's changes to tommie's files, in order: each patch applies to the
+# result of the previous ones. One that no longer applies stops the import:
+# update it against the new snapshot (BOTIFY.md).
+for p in tools/patches/*.patch; do
+  if ! git apply --check "$p"; then
+    echo "$p no longer applies to tommie/v8go@$SHA: update it (BOTIFY.md)" >&2
+    exit 1
+  fi
+  git apply "$p"
+done
+
 # PartitionAlloc's allocator shim would replace malloc/free/new/delete for the
 # whole consumer process: strip its members from the V8 archives. llvm-ar keeps
 # each archive's format (GNU, Darwin, COFF) and writes deterministic archives.

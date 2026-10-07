@@ -47,8 +47,7 @@ void ContextFree(ContextPtr ctx) {
   }
   ctx->ptr.Reset();
 
-  for (auto it = ctx->vals.begin(); it != ctx->vals.end(); ++it) {
-    auto value = it->second;
+  for (m_value* value : ctx->vals) {
     value->ptr.Reset();
     if (value->go_handle != 0) {
       goDeleteHandle(value->go_handle);
@@ -79,8 +78,7 @@ m_value* tracked_value(m_ctx* ctx, m_value* val) {
   // closed (either manually or GC'd by Go) we can also release all the
   // values associated with the context;
   if (val->id == 0) {
-    val->id = ++ctx->nextValId;
-    ctx->vals[val->id] = val;
+    ctx->vals.add(val);
   }
 
   return val;
