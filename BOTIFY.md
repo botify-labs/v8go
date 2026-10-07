@@ -36,13 +36,25 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
      référence encore un nom d'origine, ou si la table et les alias ne sont pas ceux que le script
      génère.
 
-  `tools/build_bridge.sh` renomme de même les bridges Linux, et la table entre dans
-  `tools/bridge_hash.sh`. Mode source : les objets compilés par cgo référencent les noms d'origine ;
+  `tools/build_bridge.sh` renomme de même les bridges Linux, et la table et les deux
+  scripts (`build_bridge.sh`, `rename_cxx_runtime.sh`) entrent dans `tools/bridge_hash.sh`. Mode source : les objets compilés par cgo référencent les noms d'origine ;
   `deps/linux_*/libv8go_cxxalias.a` (un script d'édition de liens généré, lié avant les archives en
   mode source seulement) les définit comme alias des noms renommés (`EXTERN` + `PROVIDE`), et
   `botify_cxxalias_linux.go` redirige `operator new`/`delete` par `--wrap`, pour qu'ils restent ceux
   de V8 même à côté de ceux d'ASan (`-tags leakcheck`). Preuve : `internal/cxxprobe` (C++ g++ lié avec
   v8go, tag `cxxprobe`), exécuté en lien entièrement statique par le job `static-cxx-probe`.
+- **Limites du mode source** (`-tags v8go_source`, réservé au développement de v8go ; le mode
+  consommateur, par défaut, est isolé) : l'isolation du runtime C++ de V8 n'y existe pas, l'exécutable
+  définit et exporte toujours les noms d'origine (`__cxa_*`, `std::exception`…), qu'il fait passer
+  devant ceux de libstdc++.so.
+  - Du code g++/libstdc++ lié avec `-tags v8go_source` n'est **pas supporté** : ses exceptions et sa
+    RTTI se lient au runtime de Chromium (lien dynamique : `std::terminate` ; lien statique :
+    `multiple definition`) ;
+  - sous ASan (`-tags leakcheck`), `operator new`/`delete` de V8 et de v8go passent par ceux de
+    libc++abi : la détection des `new`/`delete` non appariés (`alloc-dealloc-mismatch`) est perdue
+    pour ce code. LeakSanitizer et les contrôles au niveau de `malloc` ne changent pas ;
+  - les alias (`libv8go_cxxalias.a`) ne sont testés qu'avec GNU ld (le défaut du pilote clang-21) ;
+    lld et gold ne le sont pas.
 - **Chemin JS→Go** (Task 25, `bench/results/2026-10-07-callback/callback-perf.md`) :
   `botify_values.h` (valeurs suivies par un contexte : vecteur indexé au lieu de
   l'`unordered_map` de tommie, libérées par adresse de handle décroissante au `Cleanup`),
@@ -70,7 +82,7 @@ de v8go qu'il requiert, mais dans les versions des modules `deps/*` que le `go.m
   versions.
 
 Après toute modification de ce qu'empreinte `tools/bridge_hash.sh` (C++, patchs, `//export`, V8,
-table de renommage du runtime C++) :
+table de renommage du runtime C++, scripts `build_bridge.sh` et `rename_cxx_runtime.sh`) :
 1. pousser. `botify-bridge` reconstruit les bridges (seul pour `*.cc`, `*.h`, `tools/patches/`,
    `tools/cxx-runtime-rename.map`, ses scripts et
    `deps/v8_hash` sur upgrade-v8, sinon le lancer à la main) et pousse un commit

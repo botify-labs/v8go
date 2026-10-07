@@ -5,7 +5,7 @@
 # name, and the map and the source-mode aliases
 # (deps/linux_*/libv8go_cxxalias.a, botify_cxxalias_linux.go) are the ones
 # tools/gen_cxx_runtime_rename_map.sh derives from the archives (a new libc++
-# symbol is renamed too).
+# symbol is renamed too), and no archive holds a double suffix (X.v8cr.v8cr).
 # tools/sync_tommie.sh and tools/build_bridge.sh apply the map
 # (tools/rename_cxx_runtime.sh).
 # Usage: tools/check_cxx_runtime_isolated.sh [os_arch ...]   (default: all deps/linux_*)
@@ -52,6 +52,14 @@ for t in "${targets[@]}"; do
     if [ -n "$left" ]; then
       echo "$lib: C++ runtime symbol(s) not renamed (tools/rename_cxx_runtime.sh):"
       echo "$left"
+      bad=1
+    fi
+    # A symbol renamed twice (X.v8cr.v8cr) is bound by nobody: the link would
+    # fail later with undefined references.
+    twice=$(awk 'NF >= 2 && $1 ~ /\.v8cr\.v8cr$/ { print "  " $1 }' <<<"$syms" | LC_ALL=C sort -u)
+    if [ -n "$twice" ]; then
+      echo "$lib: symbol(s) renamed twice (.v8cr.v8cr), restore the archive and rename it once:"
+      echo "$twice"
       bad=1
     fi
   done

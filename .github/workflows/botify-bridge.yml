@@ -23,6 +23,7 @@ on:
     - tools/cxx-runtime-rename.map
     - tools/rename_cxx_runtime.sh
     - tools/build_bridge.sh
+    - tools/bridge_hash.sh
 
 permissions:
   contents: read

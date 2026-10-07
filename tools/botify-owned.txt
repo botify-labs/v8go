@@ -32,4 +32,7 @@
 /tools/check_cxx_runtime_isolated.sh
 /tools/cxx-runtime-rename.map
 /deps/linux_*/libv8go_cxxalias.a
+# The whole directory (not only internal/cxxprobe/): rsync --delete cannot remove a
+# non-empty directory it considers absent from the source. If tommie ever adds an
+# internal/ of its own, this line makes the sync ignore it silently.
 /internal/

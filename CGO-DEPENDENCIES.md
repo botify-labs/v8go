@@ -107,6 +107,16 @@ de particulier.
 **Les libs C pures** (zstd, igzip/ISA-L) ne référencent aucun symbole libstdc++ : elles ne sont pas
 concernées, en dynamique comme en statique.
 
+**Limites du mode source** (`-tags v8go_source`, développement de v8go) : il n'est pas isolé
+(l'exécutable exporte les noms d'origine), donc du code g++/libstdc++ lié avec lui n'est pas
+supporté ; sous ASan, la détection des `new`/`delete` non appariés est perdue pour le code de V8 et
+de v8go. Le mode consommateur (par défaut) est isolé : voir `BOTIFY.md`.
+
+**Comportement qui change pour les consommateurs** : `std::set_terminate`, `std::set_new_handler` et
+un `operator new` global remplacé dans votre code n'agissent plus sur V8 (en lien dynamique, ils
+l'atteignaient avant l'isolation, par interposition des noms). Ils agissent toujours sur votre propre
+C++.
+
 ### 2.3 Plancher glibc
 
 - À l'exécution : **glibc ≥ 2.34** (Amazon Linux 2023 convient ; Amazon Linux 2 n'est plus supporté).
@@ -320,7 +330,7 @@ couche ABI :
 | `tools/cxx-runtime-rename.map` | la table committée : `nom nom.v8cr`, 499 lignes |
 | `tools/rename_cxx_runtime.sh` | l'applique (`objcopy --redefine-syms`) aux archives V8, libc++, compiler-rt et aux bridges Linux ; idempotent |
 | `tools/check_cxx_runtime_isolated.sh` | échoue si une archive Linux définit ou référence un nom d'origine, ou si la table n'est plus à jour |
-| `tools/sync_tommie.sh`, `tools/build_bridge.sh` | appliquent le renommage à chaque import de V8 et à chaque construction de bridge ; la table entre dans l'empreinte des bridges |
+| `tools/sync_tommie.sh`, `tools/build_bridge.sh` | appliquent le renommage à chaque import de V8 et à chaque construction de bridge ; la table et les scripts entrent dans l'empreinte des bridges |
 | `deps/linux_*/libv8go_cxxalias.a`, `botify_cxxalias_linux.go` | mode source seulement (`-tags v8go_source`) : alias des noms d'origine pour les objets compilés par cgo (script d'édition de liens et `--wrap` de `operator new`/`delete`) |
 | `internal/cxxprobe`, job `static-cxx-probe` | preuve en CI : C++ g++ et v8go dans un binaire entièrement statique, amd64 et arm64 |
 
