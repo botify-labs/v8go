@@ -177,6 +177,36 @@ func (tmpl *FunctionTemplate) Inherit(base *FunctionTemplate) {
 	C.FunctionTemplateInherit(tmpl.ptr, base.ptr)
 }
 
+// Botify: what goFunctionCallback allocates for a call with up to 2 or 4
+// arguments, in one block, instead of 3 + argsCount blocks. A Value stays
+// valid as long as it is referenced, like a separately allocated one: the
+// block is collected once none of its parts is referenced anymore.
+type callbackFrame2 struct {
+	info FunctionCallbackInfo
+	this Object
+	vals [3]Value
+	args [2]*Value
+}
+
+type callbackFrame4 struct {
+	info FunctionCallbackInfo
+	this Object
+	vals [5]Value
+	args [4]*Value
+}
+
+// fillCallbackFrame fills a frame's parts. vals and args are its arrays.
+func fillCallbackFrame(info *FunctionCallbackInfo, thisObj *Object, vals []Value, args []*Value,
+	ctx *Context, this C.ValuePtr, argv []C.ValuePtr) {
+	vals[0] = Value{ptr: this, ctx: ctx}
+	thisObj.Value = &vals[0]
+	for i, v := range argv {
+		vals[i+1] = Value{ptr: v, ctx: ctx}
+		args[i] = &vals[i+1]
+	}
+	*info = FunctionCallbackInfo{ctx: ctx, this: thisObj, args: args[:len(argv):len(argv)]}
+}
+
 // Note that ideally `thisAndArgs` would be split into two separate arguments, but they were combined
 // to workaround an ERROR_COMMITMENT_LIMIT error on windows that was detected in CI.
 //
@@ -190,16 +220,27 @@ func goFunctionCallback(
 	ctx := getContext(ctxref)
 
 	this := *thisAndArgs
-	info := &FunctionCallbackInfo{
-		ctx:  ctx,
-		this: &Object{&Value{ptr: this, ctx: ctx}},
-		args: make([]*Value, argsCount),
-	}
-
 	argv := (*[1 << 30]C.ValuePtr)(unsafe.Pointer(thisAndArgs))[1 : argsCount+1 : argsCount+1]
-	for i, v := range argv {
-		val := &Value{ptr: v, ctx: ctx}
-		info.args[i] = val
+	var info *FunctionCallbackInfo
+	switch {
+	case argsCount <= len(callbackFrame2{}.args):
+		f := &callbackFrame2{}
+		fillCallbackFrame(&f.info, &f.this, f.vals[:], f.args[:], ctx, this, argv)
+		info = &f.info
+	case argsCount <= len(callbackFrame4{}.args):
+		f := &callbackFrame4{}
+		fillCallbackFrame(&f.info, &f.this, f.vals[:], f.args[:], ctx, this, argv)
+		info = &f.info
+	default:
+		info = &FunctionCallbackInfo{
+			ctx:  ctx,
+			this: &Object{&Value{ptr: this, ctx: ctx}},
+			args: make([]*Value, argsCount),
+		}
+		for i, v := range argv {
+			val := &Value{ptr: v, ctx: ctx}
+			info.args[i] = val
+		}
 	}
 
 	callbackFunc := ctx.iso.getCallback(cbref)
