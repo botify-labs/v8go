@@ -28,5 +28,8 @@ if [ "$GOOS" = windows ]; then
 else
   ar rcs "$OUT/libv8go.a" "$OBJ"/*.o
 fi
+# The bridge references V8's C++ runtime (__cxa_*, operator new...), renamed
+# in the Linux archives: rename its references the same way.
+[ "$GOOS" != linux ] || tools/rename_cxx_runtime.sh "$OUT/libv8go.a"
 tools/bridge_hash.sh >"$OUT/bridge.sha256"
 echo "built $OUT/$(ls "$OUT" | grep -E '^(libv8go\.a|v8go\.lib)$') ($(cat "$OUT/bridge.sha256"))"

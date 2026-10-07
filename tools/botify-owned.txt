@@ -27,3 +27,9 @@
 /deps/*_*/v8go.lib
 /deps/*_*/bridge.sha256
 /.github/workflows/botify-*.yml
+/tools/gen_cxx_runtime_rename_map.sh
+/tools/rename_cxx_runtime.sh
+/tools/check_cxx_runtime_isolated.sh
+/tools/cxx-runtime-rename.map
+/deps/linux_*/libv8go_cxxalias.a
+/internal/cxxprobe/

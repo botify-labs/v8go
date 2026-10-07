@@ -3,6 +3,7 @@
 package linux_arm64
 
 // #cgo LDFLAGS: -L${SRCDIR}
+// #cgo linux,v8go_source LDFLAGS: -lv8go_cxxalias
 // #cgo !v8go_source LDFLAGS: -lv8go
 // #cgo !windows LDFLAGS: -pthread
 // #cgo LDFLAGS: -Wl,--start-group -lv8-0 -lv8-1 -lv8-2 -lv8-3 -lc++-cr -lc++abi-cr -lclang_rt.builtins-cr -Wl,--end-group

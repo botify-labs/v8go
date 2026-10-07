@@ -3,6 +3,7 @@
 package darwin_amd64
 
 // #cgo LDFLAGS: -L${SRCDIR}
+// #cgo linux,v8go_source LDFLAGS: -lv8go_cxxalias
 // #cgo !v8go_source LDFLAGS: -lv8go
 // #cgo !windows LDFLAGS: -pthread
 // #cgo LDFLAGS: -lv8-0 -lv8-1 -lv8-2 -lc++-cr -lc++abi-cr -framework CoreFoundation -framework Security

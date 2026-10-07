@@ -55,6 +55,11 @@ for f in deps/*_*/cgo.go; do
   # shared library that nothing before it on the command line needs.
   sed -i '/^\/\/ #cgo linux,!v8go_source LDFLAGS: -lm$/d' "$f"
   sed -i '/^\/\/ #cgo LDFLAGS: .*-lv8-0 /a // #cgo linux,!v8go_source LDFLAGS: -lm' "$f"
+  # Source mode: the linker script that aliases the original names of V8's
+  # C++ runtime, renamed below (tools/gen_cxx_runtime_rename_map.sh). Before
+  # the archives, so that its EXTERNs load their members.
+  grep -q -- '-lv8go_cxxalias' "$f" ||
+    sed -i '/^\/\/ #cgo LDFLAGS: -L\${SRCDIR}$/a // #cgo linux,v8go_source LDFLAGS: -lv8go_cxxalias' "$f"
 done
 
 # Botify's changes to tommie's files, in order: each patch applies to the
@@ -92,7 +97,16 @@ for lib in deps/*_*/libv8-*.a deps/*_*/v8-*.lib; do
 done
 tools/check_no_allocator_shim.sh
 
+# Chromium's libc++abi and libc++ define the C++ ABI symbols libstdc++
+# defines too (__cxa_*, std::exception, operator new...): rename them in the
+# Linux archives, so that a consumer can link g++-built C++ next to v8go, even
+# fully statically. The map and the source-mode alias scripts are derived
+# from the new archives.
+tools/gen_cxx_runtime_rename_map.sh
+tools/rename_cxx_runtime.sh
+
 [ -z "$EXEC" ] || { echo "$EXEC" | xargs git add -- && echo "$EXEC" | xargs git update-index --chmod=+x --; }
 
 echo "$SHA" >deps/tommie_sha
+tools/check_cxx_runtime_isolated.sh
 echo "Imported tommie/v8go@$SHA (V8 $(cat deps/v8_hash))"
