@@ -66,6 +66,8 @@ done
 for pin in $PINS; do
   go mod edit -require="$pin"
 done
+# tommie marks some of them indirect (cgo_*.go import them all directly).
+sed -i '/github\.com\/botify-labs\/v8go\/deps\//s# // indirect$##' go.mod
 # go.sum: Botify's lines for those pins, and tommie's for the third-party
 # modules; none for tommie's own modules. tools/pin_deps.sh tidies it.
 {
