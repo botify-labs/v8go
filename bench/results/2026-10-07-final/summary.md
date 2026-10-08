@@ -1,10 +1,10 @@
 # V8 9.0 (6f9829d) → V8 15.4 (b8ae8c5) — résultats du 2026-10-07
 
-b8ae8c5 précède l'isolation du runtime C++ de V8 (version publiée : e63bbc8). L'isolation a été mesurée à part, à −0,05 % de geomean v8go (`../2026-10-07-cxx-isolation/`) : les chiffres ci-dessous valent pour la version publiée.
+Le code mesuré (b8ae8c5) est celui des bridges épinglés à cette date. L'isolation du runtime C++ de V8, ajoutée ensuite, a été mesurée à part, à −0,05 % de geomean v8go (`../2026-10-07-cxx-isolation/`). Les correctifs postérieurs (garde-fous du pompage des tâches V8 dans `Isolate.Cleanup` et des callbacks, `tools/patches/0005-callback-guards.patch`) ont été mesurés à −0,75 % de geomean, non significatif, sur les benchmarks de callback (mesure séparée, non versionnée ici). Les chiffres ci-dessous valent donc pour la version publiée.
 
-Machine : Intel Core Ultra 9 285H, 16 CPU, Docker linux/amd64 (WSL2), Go 1.27.1, gcc 12.2. La nouvelle version est compilée comme chez un consommateur (gcc + bridge précompilé, sans allocator shim, avec les optimisations du chemin JS→Go). La version gojs est cdf 9cfc650, comparée à cdf master 97ab17b. COUNT=10.
+Machine : Intel Core Ultra 9 285H, 16 CPU, Docker linux/amd64 (WSL2), Go 1.27.1, gcc 12.2. La nouvelle version est compilée comme chez un consommateur (gcc + bridge précompilé, sans allocator shim, avec les optimisations du chemin JS→Go). gojs (consommateur interne) : branche de migration 9cfc650, comparée à sa version de production 97ab17b. COUNT=10.
 
-**v8go** : `v8go-il-*.txt`, mesuré en alternant ancienne et nouvelle version à chaque tour (10 tours), pour neutraliser les perturbations de la machine. Le premier passage non alterné (`v8go-benchstat.txt`) a été trop bruité côté nouvelle version (±33 à ±206 %) et n'est pas retenu.
+**v8go** : `v8go-il-*.txt`, mesuré en alternant ancienne et nouvelle version (10 tours d'un passage `-test.count 1` chacun, l'ordre des deux versions changeant à chaque tour, `Cleanup1000Values` à part en `-test.benchtime 2000x`), pour neutraliser les perturbations de la machine. Le script de ce passage n'a pas été conservé : la section `v8go-il` de `bench/run.sh` (`tools/docker/dev.sh bench/run.sh v8go-il`) reproduit la procédure. Le premier passage non alterné (`v8go-benchstat.txt`) a été trop bruité côté nouvelle version (±33 à ±206 %) et n'est pas retenu.
 **gojs et endurance** : passage `bench/run.sh` du même jour.
 
 ## v8go (alterné, `v8go-il-benchstat.txt`)
@@ -37,7 +37,7 @@ Toutes les lignes sont significatives (p < 0.05, n=10).
 
 ## gojs
 
-**Chiffre à retenir : environ −6 % de geomean** (−5,90 %), mesuré en alternant baseline et nouvelle version à chaque tour (10 tours) avec les optimisations JS→Go (`../2026-10-07-callback/callback-perf.md`, section gojs ; le passage alterné précédent, sans ces optimisations, donnait −5,8 %, `../2026-10-06-noshim/`). Contre la baseline : `V8_Cleanup/*` −3 à −12 % (WriteAttributes non significatif), `V8_ColdStart/*` −4 à −9 %, `V8_CleanupOnly` +11 % (1,65 → 1,83 µs).
+**Chiffre à retenir : environ −6 % de geomean** (−5,90 %), mesuré en alternant baseline et nouvelle version à chaque tour (10 tours) avec les optimisations JS→Go (`../2026-10-07-callback/callback-perf.md`, section gojs ; le passage `bench/run.sh` précédent, sans ces optimisations, donnait −5,8 % (`../2026-10-06-noshim/`, non alterné : `bench/run.sh` mesure chaque version avec `-count 10` d'affilée). Contre la baseline : `V8_Cleanup/*` −3 à −12 % (WriteAttributes non significatif), `V8_ColdStart/*` −4 à −10 %, `V8_CleanupOnly` +11 % (1,65 → 1,83 µs).
 
 Le passage `bench/run.sh` de ce jour (`gojs-benchstat.txt`), **non alterné**, donne −19,5 % de geomean, mais sa baseline varie jusqu'à ±109 % selon les lignes : c'est une borne haute bruitée, à ne pas citer comme résultat.
 

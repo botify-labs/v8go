@@ -1,6 +1,6 @@
 # V8 9.0 (6f9829d) → V8 15.4.80.20 (deps/v8_hash b3d6849), sans allocator shim — résultats du 2026-10-06
 
-Machine : Intel Core Ultra 9 285H, 16 CPU visibles (Docker Desktop / WSL2, 31 GiB) — COUNT=10 — linux/amd64 (Docker, Go 1.27.1, gcc 12.2), nouvelle version compilée comme chez un consommateur (gcc + bridge précompilé). v8go 40178f3 (libs V8 sans l'*allocator shim* de PartitionAlloc, retiré par `tools/sync_tommie.sh`), baseline 6f9829d ; cdf upgrade e593b27, baseline 97ab17b (+ require goja temporaire, voir `bench/run.sh`). `BenchmarkCleanup1000Values` tourne à part avec `-benchtime=2000x`, mêmes réglages pour les deux versions. Détails : `env-213246.txt`.
+Machine : Intel Core Ultra 9 285H, 16 CPU visibles (Docker Desktop / WSL2, 31 GiB) — COUNT=10 — linux/amd64 (Docker, Go 1.27.1, gcc 12.2), nouvelle version compilée comme chez un consommateur (gcc + bridge précompilé). v8go 40178f3 (libs V8 sans l'*allocator shim* de PartitionAlloc, retiré par `tools/sync_tommie.sh`), baseline 6f9829d ; gojs (consommateur interne) : branche de migration e593b27, baseline 97ab17b (+ require goja temporaire, voir `bench/run.sh`). `BenchmarkCleanup1000Values` tourne à part avec `-benchtime=2000x`, mêmes réglages pour les deux versions. Détails : `env-213246.txt`.
 
 La campagne précédente, **avec** le shim, est `../2026-10-06/` (Task 14). Cette campagne la remplace.
 
@@ -135,7 +135,7 @@ HeapPerContext-16   69.83k ± 0%   88.31k ± 0%  +26.46% (p=0.000 n=10)
 ```
 goos: linux
 goarch: amd64
-pkg: github.com/botify-hq/cdf/gojs
+pkg: gojs (internal consumer)
 cpu: Intel(R) Core(TM) Ultra 9 285H
                                 │  baseline   │                 new                 │
                                 │   sec/op    │   sec/op     vs base                │
@@ -226,7 +226,7 @@ CallJSFromGo (+2.8 %) et ValueToGoString (+2.6 %) restent sous le seuil de 5 %.
 - **CompileLodashWithCodeCache** : -11.9 % (contre +21.4 % avec shim). C'est cohérent avec l'A/B de la Task 14, où il revenait au niveau de la baseline sans shim.
 - **gojs V8_Cleanup/*** : au niveau de la baseline (-4.6 % à +3.6 %, QuerySelectors n.s.). **V8_ColdStart/*** : -12.5 à -14.2 %.
 
-Les preuves brutes de l'analyse du shim (strace, défauts de page, callgrind) sont dans le rapport de la Task 14. Le retrait lui-même (inventaire des 5 plateformes, méthode) est décrit dans le rapport de la Task 24 (`.superpowers/sdd/2026-10-06-v8-upgrade/task-24-report.md`).
+Les preuves brutes de l'analyse du shim (strace, défauts de page, callgrind) sont dans le rapport de la Task 14. Le retrait lui-même (inventaire des 5 plateformes, méthode) est décrit dans le rapport de la Task 24. Ces rapports de travail ne sont pas publiés.
 
 ## Autres plateformes (CI GitHub, run 37578680646, COUNT=10)
 

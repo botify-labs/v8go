@@ -116,8 +116,8 @@ valeur, v4 206 Ir et 1,03 (`callgrind/ContextCleanup-cache-sim.txt`).
 
 ## gojs
 
-`gojs/` (`gojs.sh`) : baseline (cdf master + v8go 6f9829d), avant (cdf upgrade + v8go 0d384af, i.e.
-v0) et après (cdf upgrade + cette version), entrelacés, 10 tours.
+`gojs/` (`gojs.sh`, gojs étant un consommateur interne) : baseline (gojs de production + v8go 6f9829d), avant (gojs migré + v8go 0d384af, i.e.
+v0) et après (gojs migré + cette version), entrelacés, 10 tours.
 
 ```
                                 │  baseline   │            avant            │            après            │ après vs avant │

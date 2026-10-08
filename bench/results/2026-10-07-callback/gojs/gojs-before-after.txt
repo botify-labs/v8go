@@ -1,6 +1,6 @@
 goos: linux
 goarch: amd64
-pkg: github.com/botify-hq/cdf/gojs
+pkg: gojs (internal consumer)
 cpu: Intel(R) Core(TM) Ultra 9 285H
                                 │   before    │               after                │
                                 │   sec/op    │   sec/op     vs base               │

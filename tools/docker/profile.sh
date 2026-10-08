@@ -32,45 +32,31 @@ EOF
   export GOWORK=/tmp/v8go.work
 }
 
-# Workspace for gojs. $1 is "baseline" (cdf master + v8go 6f9829d) or "new"
-# (cdf upgrade-v8go + local v8go).
+# Workspace for gojs, an internal consumer (bench/run.sh: GOJS_* variables).
+# $1 is "baseline" (gojs on v8go 6f9829d, /src/v8go-baseline) or "new" (gojs
+# on this v8go checkout).
 gojs_work() {
+  local dirs d
   case "$1" in
-  baseline)
-    cat >/tmp/gojs.work <<'EOF'
-go 1.27
-
-use (
-	/src/cdf-gojs-baseline/gojs
-	/src/cdf-gojs-baseline/go/pkg
-	/src/cdf-gojs-baseline/liburlnorm/go/urlnorm
-)
-
-replace rogchap.com/v8go => /src/v8go-baseline
-EOF
-    ;;
-  new)
-    # Unversioned replaces: local runs use this v8go checkout and its deps
-    # modules whatever version gojs pins. v8go is not also listed in `use`:
-    # Go rejects a go.work that replaces a workspace module at all versions.
-    cat >/tmp/gojs.work <<'EOF'
-go 1.27
-
-use (
-	/src/cdf-gojs-upgrade/gojs
-	/src/cdf-gojs-upgrade/go/pkg
-	/src/cdf-gojs-upgrade/liburlnorm/go/urlnorm
-)
-
-replace github.com/botify-labs/v8go => /src/v8go
-replace github.com/botify-labs/v8go/deps/darwin_amd64 => /src/v8go/deps/darwin_amd64
-replace github.com/botify-labs/v8go/deps/darwin_arm64 => /src/v8go/deps/darwin_arm64
-replace github.com/botify-labs/v8go/deps/linux_amd64 => /src/v8go/deps/linux_amd64
-replace github.com/botify-labs/v8go/deps/linux_arm64 => /src/v8go/deps/linux_arm64
-replace github.com/botify-labs/v8go/deps/windows_amd64 => /src/v8go/deps/windows_amd64
-EOF
-    ;;
+  baseline) dirs="${GOJS_BASELINE:?} ${GOJS_BASELINE_USE:-}" ;;
+  new) dirs="${GOJS_UPGRADE:?} ${GOJS_UPGRADE_USE:-}" ;;
   *) echo "usage: gojs_work baseline|new" >&2; return 1 ;;
   esac
+  {
+    printf 'go 1.27\n\nuse (\n'
+    for d in $dirs; do printf '\t%s\n' "$d"; done
+    printf ')\n\n'
+    if [ "$1" = baseline ]; then
+      echo 'replace rogchap.com/v8go => /src/v8go-baseline'
+    else
+      # Unversioned replaces: local runs use this v8go checkout and its deps
+      # modules whatever version gojs pins. v8go is not also listed in `use`:
+      # Go rejects a go.work that replaces a workspace module at all versions.
+      echo 'replace github.com/botify-labs/v8go => /src/v8go'
+      for d in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64; do
+        echo "replace github.com/botify-labs/v8go/deps/$d => /src/v8go/deps/$d"
+      done
+    fi
+  } >/tmp/gojs.work
   export GOWORK=/tmp/gojs.work
 }

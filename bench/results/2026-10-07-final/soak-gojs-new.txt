@@ -2,4 +2,4 @@
     soak_test.go:118: post-GC RSS 48 -> 58 MiB, second-half growth 0.55%, peak RSS 59 MiB, Go heap last 889 KiB
 --- PASS: TestSoakV8Cleanup (16.68s)
 PASS
-ok  	github.com/botify-hq/cdf/gojs	16.687s
+ok  	gojs (internal consumer)	16.687s

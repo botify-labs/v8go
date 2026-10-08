@@ -3,5 +3,5 @@
     soak_test.go:121: post-GC RSS grew 5.24% over the second half (limit 5%): leak
 --- FAIL: TestSoakV8Cleanup (19.25s)
 FAIL
-FAIL	github.com/botify-hq/cdf/gojs	19.254s
+FAIL	gojs (internal consumer)	19.254s
 FAIL

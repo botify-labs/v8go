@@ -1,6 +1,6 @@
 # V8 9.0 (6f9829d) → V8 15.4.80.20 (deps/v8_hash b3d6849) — résultats du 2026-10-06
 
-Machine : Intel Core Ultra 9 285H, 16 CPU visibles (Docker Desktop / WSL2, 31 GiB) — COUNT=10 — linux/amd64 (Docker, Go 1.27.1, gcc 12.2), nouvelle version compilée comme chez un consommateur (gcc + bridge précompilé). v8go 57cc167, baseline 6f9829d ; cdf upgrade e593b27, baseline 97ab17b (+ require goja temporaire, voir `bench/run.sh`). `BenchmarkCleanup1000Values` tourne à part avec `-benchtime=2000x`, avec les mêmes réglages pour les deux versions. Détails : `env-194031.txt`.
+Machine : Intel Core Ultra 9 285H, 16 CPU visibles (Docker Desktop / WSL2, 31 GiB) — COUNT=10 — linux/amd64 (Docker, Go 1.27.1, gcc 12.2), nouvelle version compilée comme chez un consommateur (gcc + bridge précompilé). v8go 57cc167, baseline 6f9829d ; gojs (consommateur interne) : branche de migration e593b27, baseline 97ab17b (+ require goja temporaire, voir `bench/run.sh`). `BenchmarkCleanup1000Values` tourne à part avec `-benchtime=2000x`, avec les mêmes réglages pour les deux versions. Détails : `env-194031.txt`.
 
 ## v8go
 ```
@@ -108,7 +108,7 @@ HeapPerContext-16   69.83k ± 0%   88.31k ± 0%  +26.46% (p=0.000 n=10)
 ```
 goos: linux
 goarch: amd64
-pkg: github.com/botify-hq/cdf/gojs
+pkg: gojs (internal consumer)
 cpu: Intel(R) Core(TM) Ultra 9 285H
                                 │   baseline   │                 new                 │
                                 │    sec/op    │   sec/op     vs base                │
@@ -230,4 +230,4 @@ Hypothèses écartées, avec la preuve :
 ### Proposition (non appliquée dans cette tâche)
 Construire V8 sans le shim malloc de PartitionAlloc : ajouter les arguments gn `use_partition_alloc_as_malloc=false` et `use_allocator_shim=false` dans `deps/build.py`, puis relancer `bench/run.sh` et la suite de tests. Une bibliothèque embarquée ne devrait pas remplacer le malloc du process hôte, ni pour la performance, ni pour la cohabitation avec les autres bibliothèques C de gojs. Pistes secondaires : remplacer le `unordered_map` de suivi par un vecteur indexé avec réutilisation des slots, et éviter le `std::vector` alloué sur le tas à chaque callback.
 
-Les preuves brutes (sorties benchstat des A/B, callgrind, strace, `/usr/bin/time -v`) figurent dans le rapport de la tâche 14 (`.superpowers/sdd/2026-10-06-v8-upgrade/task-14-report.md`).
+Les preuves brutes (sorties benchstat des A/B, callgrind, strace, `/usr/bin/time -v`) figurent dans le rapport de travail de la tâche 14, non publié.

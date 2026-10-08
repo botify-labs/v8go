@@ -1,6 +1,6 @@
 goos: linux
 goarch: amd64
-pkg: github.com/botify-hq/cdf/gojs
+pkg: gojs (internal consumer)
 cpu: Intel(R) Core(TM) Ultra 9 285H
 BenchmarkV8_Cleanup/QuerySelectors-16         	    8318	    128695 ns/op	   80014 B/op	    1120 allocs/op
 BenchmarkV8_Cleanup/QuerySelectors-16         	    8611	    129318 ns/op	   80011 B/op	    1120 allocs/op
@@ -133,4 +133,4 @@ BenchmarkV8_CleanupOnly-16                    	  404145	      2724 ns/op	     32
 BenchmarkV8_CleanupOnly-16                    	  491908	      2237 ns/op	     320 B/op	      11 allocs/op
 BenchmarkV8_CleanupOnly-16                    	  525252	      2178 ns/op	     320 B/op	      11 allocs/op
 PASS
-ok  	github.com/botify-hq/cdf/gojs	172.860s
+ok  	gojs (internal consumer)	172.860s

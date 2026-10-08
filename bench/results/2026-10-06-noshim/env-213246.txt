@@ -7,4 +7,4 @@ go: go version go1.27.1 linux/amd64
 gcc: gcc (Debian 12.2.0-14+deb12u1) 12.2.0
 COUNT=10 SOAK_ITERATIONS=100000
 v8go: 40178f3, baseline: 6f9829d
-cdf upgrade: e593b27, baseline: 97ab17b
+gojs upgrade: e593b27, baseline: 97ab17b
