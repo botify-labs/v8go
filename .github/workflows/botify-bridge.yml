@@ -12,8 +12,8 @@ on:
   # (tools/check_bridge.sh): a push that leaves the fingerprint unchanged, such
   # as an edit of this file, commits nothing. The bot commits on the pushed
   # branch (its commit doesn't trigger workflows), so the bridges are rebuilt on
-  # the PR branch (upgrade-v8 until it is merged) and never pushed to master,
-  # which stays protected. The fingerprint also covers the Go files with
+  # the PR branch and never pushed to master, which only changes through PRs
+  # (BOTIFY.md). The fingerprint also covers the Go files with
   # //export (tools/bridge_hash.sh): after a change to one of those alone,
   # botify-ci's check_bridge fails; run this one by hand.
   push:
@@ -110,8 +110,8 @@ jobs:
           cp "$d"/* "deps/${d#artifacts/bridge-}/"
         done
         tools/check_bridge.sh
-    # Never on master (protected; also by hand: workflow_dispatch accepts it):
-    # go through a PR branch.
+    # Never on master, also by hand (workflow_dispatch accepts it): master only
+    # changes through PRs, and pinned deps commits must stay reachable.
     - if: github.ref != 'refs/heads/master'
       uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
       with:

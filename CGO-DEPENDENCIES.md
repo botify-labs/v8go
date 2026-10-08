@@ -3,7 +3,9 @@
 Ce document explique pourquoi certaines bibliothèques cgo ont dû être recompilées (Windows) ou
 « prélinkées » (Linux statique, avant l'isolation du runtime C++ de V8) pour adopter `github.com/botify-labs/v8go`, et comment traiter les futures dépendances cgo.
 Il complète `MIGRATION.md` (ce qui change pour un consommateur) et `BOTIFY.md` (le fonctionnement du
-fork). L'inventaire détaillé de ftl et pulse est dans `docs/superpowers/cgo-inventory.md`.
+fork). Les exemples cités (liburlnorm, une lib C++ de normalisation d'URL liée à ICU ; zstd ; igzip)
+sont les libs précompilées des consommateurs internes de Botify ; leur inventaire détaillé n'est pas
+publié ici.
 
 En résumé :
 
@@ -12,7 +14,9 @@ En résumé :
   le C++ tiers n'est pas testé (§2.4).
 - **Linux, lien totalement statique (`-extldflags '-static'`) : rien à faire non plus.** Le runtime
   C++ de V8 est renommé dans ses archives Linux : les libs C++ g++/libstdc++ n'entrent plus en conflit
-  avec lui (§2.2). Le prélink de liburlnorm a été retiré de cdf.
+  avec lui (§2.2), sans prélink.
+- **Linux arm64 :** v8go le supporte ; une lib précompilée doit alors fournir aussi une archive arm64
+  (§2.5).
 - **Windows :** tout est lié statiquement en ABI MSVC (`/MT`). Toute lib précompilée en MinGW doit être
   recompilée en MSVC.
 
@@ -38,9 +42,9 @@ Le bridge précompilé est lié automatiquement (`#cgo !v8go_source LDFLAGS: -lv
 Sont compatibles, sans rien changer :
 
 - les packages cgo compilés depuis leurs sources (DataDog/zstd, `lz4`…) ;
-- les libs C précompilées (zstd de gocdf, igzip/ISA-L) ;
-- les libs **C++ construites avec g++/libstdc++**, par exemple liburlnorm + ICU 65 : elles cohabitent
-  avec V8 dans le même binaire (testé dans gojs, y compris Intl).
+- les libs C précompilées (zstd, igzip/ISA-L) ;
+- les libs **C++ construites avec g++/libstdc++**, par exemple liburlnorm et son ICU : elles cohabitent
+  avec V8 dans le même binaire (testé dans gojs, un consommateur interne, y compris Intl).
 
 Pourquoi ça marche :
 
@@ -56,7 +60,7 @@ levée à l'intérieur de libstdc++ (`std::stoi("x")`, par exemple) et attrapée
 `std::terminate`. Les tests de gojs (liburlnorm) ne passaient pas par ce chemin ; `internal/cxxprobe` le
 reproduit.
 
-### 2.2 Lien totalement statique (`-extldflags '-static'`, comme pulse) : fonctionne, libs C++ g++ comprises
+### 2.2 Lien totalement statique (`-extldflags '-static'`) : fonctionne, libs C++ g++ comprises
 
 Dans un lien statique, libstdc++ est `libstdc++.a` (libsupc++). Chromium laisse volontairement hors de
 son namespace privé `std::__Cr` la couche ABI C++, pour la compatibilité Itanium : `__cxa_*`,
@@ -99,13 +103,11 @@ Après le renommage, le binaire contient les deux runtimes côte à côte (`__cx
 `std::invalid_argument` venue de libstdc++, utilise RTTI et iostream, lié en `-static` avec v8go sur
 amd64 et arm64), et par gojs lié en `-static` avec la liburlnorm **d'origine** (non prélinkée).
 
-**liburlnorm** (C++ + ICU 65, la seule lib C++ précompilée de ftl et pulse) avait été **prélinkée avec
-une libstdc++ privée** (`liburlnorm/scripts/prelink_linux.sh` dans cdf, `liburlnorm_prelinked.a`, seule
-l'API C reste globale) pour contourner ce conflit. Ce prélink n'étant plus nécessaire, il a été
-**retiré** (cdf `upgrade-v8go`, commit ebbccce) : `urlnorm.go` a retrouvé la ligne `#cgo linux LDFLAGS`
-de master (`-lurlnorm -licui18n -licuio -licutu -licuuc -licudata -ldl`), et gojs se lie en `-static`
-avec ces libs d'origine. Le test `normalize_pinned_test.go` (valeurs de normalisation figées) a été
-gardé. Une future lib C++ n'a rien à faire de particulier.
+**liburlnorm** (C++ + ICU, précompilée avec g++) avait d'abord été **prélinkée avec une libstdc++
+privée** (un seul objet dont seule l'API C restait globale) pour contourner ce conflit. Ce prélink
+n'étant plus nécessaire, il a été **retiré** : la lib se lie de nouveau avec ses `LDFLAGS` d'origine
+(`-lurlnorm -licui18n -licuio -licutu -licuuc -licudata -ldl`), en `-static` comme en dynamique. Une
+future lib C++ n'a rien à faire de particulier.
 
 **Les libs C pures** (zstd, igzip/ISA-L) ne référencent aucun symbole libstdc++ : elles ne sont pas
 concernées, en dynamique comme en statique.
@@ -122,14 +124,19 @@ C++.
 
 ### 2.3 Plancher glibc
 
-- À l'exécution : **glibc ≥ 2.34** (Amazon Linux 2023 convient ; Amazon Linux 2 n'est plus supporté).
-- Le plancher dépend de l'**hôte de build** : les archives V8 référencent des symboles libm sans
-  version (`fmod`…), liés à la version par défaut de la glibc de l'hôte. Lié sur une glibc ≥ 2.38, le
-  binaire exige `fmod@GLIBC_2.38` et ne démarre pas sur AL2023. **Construire sur la plus ancienne cible**
-  (`amazonlinux:2023`). Vérification :
+- V8 demande **glibc ≥ 2.31** (archives de tommie construites contre le sysroot Debian bullseye de
+  Chromium ; plancher annoncé par tommie, non testé par la CI de Botify).
+- **2.34 est la cible de Botify**, pas le plancher de V8 : Amazon Linux 2023 (glibc 2.34). Le job
+  `glibc-floor` de botify-ci construit un binaire consommateur dans `amazonlinux:2023` (linux/amd64),
+  vérifie qu'il ne demande pas plus que `GLIBC_2.34` et y lance les tests. Amazon Linux 2 (glibc 2.26)
+  n'est pas supporté.
+- Le plancher effectif dépend de l'**hôte de build** : les archives V8 référencent des symboles libm
+  sans version (`fmod`…), liés à la version par défaut de la glibc de l'hôte. Lié sur une glibc ≥ 2.38,
+  le binaire exige `fmod@GLIBC_2.38` et ne démarre pas sur AL2023. **Construire sur la plus ancienne
+  cible** (par exemple `amazonlinux:2023`). Vérification :
 
 ```sh
-objdump -T ./binaire | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1   # au plus GLIBC_2.34
+objdump -T ./binaire | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1   # au plus la glibc de la cible (GLIBC_2.34 pour AL2023)
 ```
 
 Un lien entièrement statique n'est pas concerné.
@@ -142,15 +149,33 @@ Un lien entièrement statique n'est pas concerné.
 | C compilé depuis les sources | OK | OK |
 | C précompilé (`.a`) | OK | OK |
 | C++ compilé depuis les sources avec g++ | OK | OK (runtime C++ de V8 renommé, §2.2) |
-| C++ précompilé avec g++/libstdc++ | OK | OK (pas de prélink : celui de liburlnorm a été retiré) |
+| C++ précompilé avec g++/libstdc++ | OK | OK (sans prélink) |
 
-macOS n'a pas de lien totalement statique : la colonne de droite ne s'y applique pas.
+macOS n'a pas de lien totalement statique : la colonne de droite ne s'y applique pas. Sous
+linux/arm64, les lignes « précompilé » supposent une archive arm64 (§2.5).
 
 macOS : le renommage du runtime C++ ne concerne que les archives Linux. Sous macOS, la
 `libc++abi-cr.a` de V8, non renommée, définit `__cxa_*` et `operator new` dans l'exécutable, et le C++
 du consommateur (liburlnorm darwin, compilée contre la libc++ d'Apple) se lie à ces définitions. C'est
 probablement sans effet (liburlnorm n'utilise pas d'exceptions, et les deux runtimes finissent dans
 `malloc`), mais ce n'est pas testé : la ligne « C++ » de ce tableau est validée sous Linux seulement.
+
+### 2.5 Linux arm64
+
+v8go supporte linux/arm64 (archives V8 et bridge `deps/linux_arm64`, testés par botify-ci, y compris
+le lien totalement statique de `static-cxx-probe`). Ce qui compile depuis ses sources suit sans rien
+faire. En revanche, une lib **précompilée** doit livrer une archive par architecture : une seule
+archive x86-64 sous `lib/linux`, référencée par un `#cgo linux LDFLAGS: -L${SRCDIR}/lib/linux` commun
+aux deux architectures, fait échouer le lien sous arm64 (format de fichier incompatible, ou symboles
+introuvables). Ranger les archives par architecture et les référencer par architecture :
+
+```go
+// #cgo linux,amd64 LDFLAGS: -L${SRCDIR}/lib/linux_amd64 -lfoo
+// #cgo linux,arm64 LDFLAGS: -L${SRCDIR}/lib/linux_arm64 -lfoo
+```
+
+Vérifier l'architecture d'une archive : `objdump -f libfoo.a | grep -m1 'file format'`
+(`elf64-x86-64` ou `elf64-littleaarch64`).
 
 ## 3. Windows (natif)
 
@@ -172,30 +197,31 @@ probablement sans effet (liburlnorm n'utilise pas d'exceptions, et les deux runt
   référencent le runtime MinGW (`___chkstk_ms`, `__mingw_vfprintf`, `__mingw_vsnprintf`…), que le CRT
   MSVC ne fournit pas.
 
-Ce qui a été recompilé (voir `docs/superpowers/cgo-inventory.md`) :
+Ce qui a été recompilé pour les consommateurs internes de Botify :
 
-| Lib | Dépôt | Résultat | Remarques |
-|---|---|---|---|
-| liburlnorm + ICU 65 | cdf | `liburlnorm/go/urlnorm/lib/windows_msvc/` (`urlnorm.lib`, `sicu{uc,in,io,tu,dt}.lib`) | ICU 65 conservée (normalisation identique à la production), compilée par clang-cl comme liburlnorm (avec cl, ~10 % plus lent que MinGW) ; workflow `windows-msvc-libs.yml` ; C++ (`libcpmt`) |
-| igzip (ISA-L) | cdf et pulse | `go/pkg/igzip/lib/windows/igzip.lib` dans chaque dépôt | ISA-L 2.31.1 (cdf) et 2.30.0 (pulse) ; assemblé avec NASM |
-| zstd | gocdf | `compress/zstd/lib/zstd_windows.lib` (PR #926) | zstd 1.5.0, clang-cl avec `-fgnuc-version` (sinon les chemins BMI2 du décodeur sont compilés sans BMI2 : décompression ~17 % plus lente ; le workflow le vérifie), build reproductible ; à publier dans une version de gocdf |
+| Lib | Langage | Remarques |
+|---|---|---|
+| liburlnorm + ICU | C++ (`libcpmt`) | ICU et liburlnorm compilées par clang-cl (avec `cl`, ~10 % plus lent que MinGW) |
+| igzip (ISA-L) | C + assembleur | assemblé avec NASM |
+| zstd | C | clang-cl avec `-fgnuc-version` : sans lui, les chemins BMI2 du décodeur de zstd 1.5.0 sont compilés sans BMI2 (décompression ~17 % plus lente) ; le workflow le vérifie, build reproductible (`/Brepro`) |
 
 Dans chaque cas, un workflow construit la lib sur un runner Windows, vérifie les symboles et le CRT,
 puis exécute `go test` avec `CC="clang -fuse-ld=lld"`, d'abord contre la `.lib` commitée, puis contre
-une reconstruction.
+une reconstruction. Les sorties sont identiques à celles des libs MinGW, et l'écart de performance
+mesuré est de quelques pour cent au plus.
 
 **Astuce de coexistence.** Avec clang ciblant MSVC, `-lfoo` résout `foo.lib` ; avec MinGW, `-lfoo`
 résout `libfoo.a`. On place donc `foo.lib` à côté de `libfoo.a` dans le même dossier `-L` : les
 `LDFLAGS` ne changent pas et les builds MinGW restent possibles.
 
 ```text
-go/pkg/igzip/lib/windows/
+igzip/lib/windows/
 ├── libigzip.a   # MinGW, ancien
 └── igzip.lib    # MSVC /MT, nouveau ; `-ligzip` prend l'un ou l'autre selon la cible
 ```
 
-(Exception : liburlnorm, dont les libs MSVC sont dans un dossier distinct, `lib/windows_msvc` ; ses
-`LDFLAGS` Windows y pointent (avec `-ladvapi32`) et les anciennes `.a` MinGW ont été retirées.)
+On peut aussi ranger les libs MSVC dans un dossier distinct (par exemple `lib/windows_msvc`) et y
+faire pointer les `LDFLAGS` Windows, en retirant les `.a` MinGW.
 
 ## 4. Ajouter un nouveau module cgo tiers : check-list
 
@@ -208,7 +234,7 @@ go/pkg/igzip/lib/windows/
 
 ### 4.1 Détecter chaque cas
 
-**Inventaire des packages cgo** (forme utilisée pour `cgo-inventory.md`, à lancer par OS cible, module
+**Inventaire des packages cgo** (forme utilisée pour inventorier les consommateurs internes, à lancer par OS cible, module
 par module) :
 
 ```sh
@@ -258,14 +284,15 @@ Une lib sans directive (données seules, comme `sicudt.lib`) est normale.
 - **C précompilé, Windows** : construire un `.lib` `/MT` (clang-cl ou `cl /MT`), le placer à côté du
   `.a`, ajouter un workflow Windows qui teste la lib committée puis une reconstruction, comme pour
   zstd et igzip.
-- **C++, lien statique Linux** : rien à faire (§2.2). Le prélink qu'avait liburlnorm
-  (`prelink_linux.sh`, retiré de cdf, voir son historique) reste une technique possible pour masquer
+- **C++, lien statique Linux** : rien à faire (§2.2). Le prélink qu'avait d'abord liburlnorm
+  (un objet unique lié à une libstdc++ privée) reste une technique possible pour masquer
   les symboles d'une lib, mais n'est plus requis pour cohabiter avec V8.
-- **C++ Windows** : reconstruire en `/MT` avec clang-cl (liburlnorm + ICU 65 en est l'exemple ; vérifier
-  l'absence de symboles `_7x` si l'ICU est dupliquée avec celle de V8, qui utilise le suffixe `_78`).
-- **Plusieurs ICU** : l'ICU de V8 (suffixe `_78`) et celle de liburlnorm (`_65`) coexistent grâce à ces
-  suffixes. Ne pas faire passer liburlnorm en ICU 78 sans un chantier dédié (doublons de symboles et
-  changement de normalisation).
+- **C++ Windows** : reconstruire en `/MT` avec clang-cl (liburlnorm et son ICU en sont l'exemple ;
+  si la lib embarque une ICU, vérifier qu'elle ne définit pas de symboles `_78`, ceux de l'ICU de V8).
+- **Plusieurs ICU** : l'ICU de V8 (suffixe `_78`) et une ICU d'une autre version liée par le
+  consommateur (suffixe `_NN`, `_71` par exemple) coexistent grâce à ces suffixes. Une ICU de la même
+  version que celle de V8 donnerait des doublons de symboles : à éviter sans un chantier dédié (un
+  changement de version d'ICU peut aussi changer des résultats, une normalisation par exemple).
 
 ## 5. Se protéger : prévention
 
@@ -274,12 +301,12 @@ Une lib sans directive (données seules, comme `sicudt.lib`) est normale.
 À mettre en place côté consommateur (ce dépôt n'ajoute pas de workflow dans les autres) :
 
 1. **Un job de lien totalement statique Linux** (`-tags 'netgo osusergo'
-   -ldflags "-linkmode external -extldflags '-static -lm'"`). C'est déjà le cas de `go-backend` dans
-   pulse : c'est ce job qui attrape les conflits libstdc++/libc++abi.
-2. **Un job Windows MSVC** si Windows compte (`CC="clang -fuse-ld=lld"`, Go ≥ 1.27), comme `gojs-windows`
-   dans cdf. Sans lui, une lib MinGW oubliée n'est détectée que par un développeur Windows.
-3. **Un contrôle du plancher glibc**, dans `amazonlinux:2023` (job `glibc-floor` de botify-ci, ou
-   build/test dans cette image comme cbjsex).
+   -ldflags "-linkmode external -extldflags '-static -lm'"`). C'est ce job qui attrapait les conflits
+   libstdc++/libc++abi avant l'isolation du runtime C++ de V8, et qui attraperait une régression.
+2. **Un job Windows MSVC** si Windows compte (`CC="clang -fuse-ld=lld"`, Go ≥ 1.27, tests compris).
+   Sans lui, une lib MinGW oubliée n'est détectée que par un développeur Windows.
+3. **Un contrôle du plancher glibc** sur la plus ancienne cible, par exemple dans `amazonlinux:2023`
+   (comme le job `glibc-floor` de botify-ci : build et tests dans cette image, `objdump -T`, §2.3).
 4. **Un job « inventaire cgo »** qui échoue quand un NOUVEAU package cgo avec lib précompilée ou C++
    apparaît, pour qu'il soit relu. Principe : exécuter la commande du §4.1 pour Linux et Windows, ne
    garder que les packages à `-L` ou à `.CXXFiles` non vide, et comparer à une liste validée
@@ -314,7 +341,9 @@ revue. Un filtre plus fin sur `-L` est possible si la liste devient bruyante.
   du build (gcc, clang-MSVC), sans lib à reconstruire par plateforme.
 - **Le C++ dans les dépendances cgo** est possible en lien totalement statique sous Linux (§2.2) ; sous
   Windows, il faut le reconstruire en `/MT` et documenter la procédure dans le dépôt de la lib.
-- Une lib précompilée livre un `.a` Linux, un `.a` macOS et un `.lib` Windows `/MT` **ensemble** ; la
+- Une lib précompilée livre **ensemble** une archive par OS et par architecture supportés : Linux
+  amd64 et arm64 (un `.a` par architecture, avec des `#cgo linux,amd64` / `#cgo linux,arm64 LDFLAGS`
+  distincts, §2.5), macOS amd64 et arm64 (ou un `.a` universel), et un `.lib` Windows `/MT` ; la
   construire par un workflow reproductible et tester la lib committée.
 
 ### 5.3 Développement Windows : l'alternative WSL2
@@ -325,8 +354,8 @@ Windows (§5.1) couvre ce besoin.
 
 ## 6. Isolation du runtime C++ de V8 (implémentée)
 
-Le conflit statique de §2.2 était résolu **dépendance par dépendance** (prélink de liburlnorm, côté cdf,
-depuis retiré).
+Le conflit statique de §2.2 était résolu **dépendance par dépendance** (prélink de liburlnorm, côté
+consommateur, depuis retiré).
 Il est désormais éliminé pour **toutes** les dépendances C++, dans v8go lui-même, sur Linux.
 
 La piste initiale était de prélinker en un seul objet le bridge, V8 et libc++/libc++abi, en
@@ -353,5 +382,3 @@ g++ et V8 (elle ne le fait pas : l'API de v8go est en C, et V8 n'en lève pas ve
 
 - `MIGRATION.md` : toolchains, glibc, mémoire, changements d'API.
 - `BOTIFY.md` : fonctionnement du fork, bridges précompilés, mise à jour de V8.
-- `docs/superpowers/cgo-inventory.md` : inventaire cgo de ftl et pulse (2026-10-06).
-- `docs/superpowers/specs/2026-10-06-v8-upgrade-design.md` : design de la montée de version, risques.

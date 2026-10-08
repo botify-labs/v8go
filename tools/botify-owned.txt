@@ -21,6 +21,7 @@
 /botify_*
 /MIGRATION.md
 /README.md
+/CHANGELOG.md
 /.gitignore
 /BOTIFY.md
 /CGO-DEPENDENCIES.md

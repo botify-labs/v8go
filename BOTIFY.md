@@ -7,11 +7,21 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   lient `deps/<os>_<arch>/libv8go.a` (`v8go.lib` sous Windows), produit par `tools/build_bridge.sh`.
   `tools/check_bridge.sh` vérifie qu'il correspond aux sources.
 - `cleanup.*` : `Isolate.Cleanup()` / `Context.Cleanup()`. `Isolate.Cleanup()` exécute les tâches
-  V8 de l'isolate ; le soak (`bench/soak_test.go`) ne passe que grâce au timer du memory reducer de
-  V8 (≥ 8 s) : le soak de 100k itérations doit durer assez longtemps (~20 s) pour qu'il se déclenche.
+  que V8 a postées pour l'isolate (GC, memory reducer), sans jamais exécuter de JS ni de callback
+  Go : chaque tâche est précédée d'une demande de terminaison, le JS qu'elle lancerait (callbacks
+  `FinalizationRegistry`) est interrompu avant sa première instruction, les callbacks de fonction
+  renvoient `undefined` sans appeler Go, et la terminaison est annulée ensuite (un
+  `TerminateExecution` demandé pendant `Cleanup` l'est aussi). Les deux `Cleanup` ne font rien s'ils
+  sont appelés avec du JS sur la pile (depuis un `FunctionCallback`). Le RSS d'un isolate
+  long-lived ne plafonne que grâce au timer du memory reducer de V8 (≥ 8 s) : un soak
+  (`bench/soak_test.go`) doit durer assez longtemps pour qu'il se déclenche. Le job `soak` de
+  botify-ci en lance 30 000 itérations (environ 9 s sur ubuntu-24.04) et vérifie une croissance du RSS
+  ≤ 5 % sur la seconde moitié et un nombre de goroutines stable : c'est à peine plus que le délai du
+  timer. La valeur par défaut, 100 000 itérations (~20 s), n'est lancée qu'à la main
+  (`bench/run.sh soak`).
 - **Allocator shim retiré** : les libs V8 de tommie embarquent l'*allocator shim* de PartitionAlloc,
   qui remplacerait `malloc`/`free`/`new`/`delete` pour tout le processus consommateur (+16 à +40 %
-  sur les appels unitaires, Task 14). `tools/sync_tommie.sh` retire ses membres des archives V8
+  sur les appels unitaires, `bench/results/2026-10-06-noshim/summary.md`). `tools/sync_tommie.sh` retire ses membres des archives V8
   (`llvm-ar d`, format d'archive conservé) à chaque import, puis lance
   `tools/check_no_allocator_shim.sh`, qui échoue s'il reste un membre du shim ou une définition de
   `malloc`/`free`/`new`/`delete` dans une archive V8. Il faut `llvm-ar`/`llvm-ranlib`/`llvm-nm`
@@ -55,60 +65,145 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
     pour ce code. LeakSanitizer et les contrôles au niveau de `malloc` ne changent pas ;
   - les alias (`libv8go_cxxalias.a`) ne sont testés qu'avec GNU ld (le défaut du pilote clang-21) ;
     lld et gold ne le sont pas.
-- **Chemin JS→Go** (Task 25, `bench/results/2026-10-07-callback/callback-perf.md`) :
+- **Chemin JS→Go** (`bench/results/2026-10-07-callback/callback-perf.md`) :
   `botify_values.h` (valeurs suivies par un contexte : vecteur indexé au lieu de
   l'`unordered_map` de tommie, libérées par adresse de handle décroissante au `Cleanup`),
   `botify_context.h` (le `m_ctx` d'un contexte rangé dans ses *embedder data* : un callback ne
   rappelle plus Go pour le trouver), un callback C++ sans `Locker`/`Isolate::Scope` ni `Global`
-  temporaire, et côté Go une seule allocation par appel jusqu'à 4 arguments. Le bridge en dépend :
-  un push sur une branche autre que master (upgrade-v8 jusqu'à sa fusion, puis la branche de la PR)
-  qui touche `*.cc`, `*.h`, `tools/patches/`, `deps/v8_hash` ou la table de
-  renommage du runtime C++ relance
-  `botify-bridge` (pas un `.go` à `//export` seul : `check_bridge` le signale, lancer le workflow à la main).
-  Les modifications des fichiers de tommie sont des patchs,
-  `tools/patches/*.patch`, que `tools/sync_tommie.sh` applique dans l'ordre après l'import : il
-  s'arrête si l'un d'eux ne s'applique plus, en laissant appliqués les précédents. Le régénérer
-  alors contre cet état : `git add -A` (sans committer), refaire la modification à la main, puis
-  `git diff -- <fichiers modifiés> > tools/patches/<patch>`, et relancer l'import.
-- `bench/` : comparaison avec `v0.6.0-botify-baseline` (V8 9.0). `tools/docker/` : environnement de dev.
-  Si `GONOSUMDB` est défini, il remplace la valeur tirée de `GOPRIVATE` : y inclure `github.com/botify-hq/*` (ex. `GONOSUMDB=github.com/botify-hq/*,github.com/botify-labs/v8go`).
+  temporaire, et côté Go une seule allocation par appel jusqu'à 4 arguments.
+- **Garde-fous des callbacks** (`tools/patches/0005-callback-guards.patch`) : une fonction dont le
+  `Context` est fermé lève `Error: v8go: context closed` au lieu de déréférencer un contexte nul ; un
+  callback Go qui renvoie l'erreur d'un script imbriqué terminé laisse la terminaison se propager au
+  lieu de la relancer comme exception attrapable ; pendant `Isolate.Cleanup`, les callbacks renvoient
+  `undefined` sans appeler Go.
+- **Patchs des fichiers de tommie** : les modifications des fichiers de tommie (chemin JS→Go,
+  garde-fous) sont des patchs, `tools/patches/*.patch` (0001 à 0005), que `tools/sync_tommie.sh`
+  applique dans l'ordre après l'import : il s'arrête si l'un d'eux ne s'applique plus, en laissant
+  appliqués les précédents. Le régénérer alors contre cet état : `git add -A` (sans committer), refaire
+  la modification à la main, puis `git diff -- <fichiers modifiés> > tools/patches/<patch>`, et
+  relancer l'import.
+- **Locale ICU** (`botify_icu.go`) : `SetDefaultLocale` fixe la locale par défaut de l'ICU de V8 pour
+  tout le processus (voir `MIGRATION.md` §3bis). Le symbole porte le suffixe de version de l'ICU
+  (`uloc_setDefault_78`) : une montée de V8 qui change d'ICU casse le lien, mettre alors le suffixe
+  à jour.
+- **Fichiers repris par Botify** : `README.md`, `CHANGELOG.md`, `.gitignore` et les docs Botify
+  (`BOTIFY.md`, `MIGRATION.md`, `CGO-DEPENDENCIES.md`) sont dans `tools/botify-owned.txt` : l'import
+  ne les touche pas. Les nouvelles entrées du `CHANGELOG.md` de tommie sont à reporter à la main si
+  utile. `tools/sync_tommie.sh` supprime à chaque import les workflows de tommie (seuls les
+  `botify-*.yml` tournent ici : ceux de tommie exécutaient du code tiers non épinglé avec des
+  secrets), `.fossa.yml`, Android et les sous-modules `deps/v8`/`deps/depot_tools`.
+- `bench/` : comparaison avec `v0.6.0-botify-baseline` (V8 9.0, checkout attendu dans
+  `../v8go-baseline`). `tools/docker/` : environnement de dev (le dossier parent de ce dépôt est monté
+  sur `/src`). Les sections gojs de `bench/run.sh` mesurent un consommateur interne, gojs : elles
+  demandent ses checkouts et un accès à ses modules privés (variables `GOJS_*`, `GOPRIVATE`,
+  `GH_TOKEN`, voir l'en-tête de `bench/run.sh`). Si `GONOSUMDB` est défini, il remplace la valeur
+  tirée de `GOPRIVATE` : y inclure aussi ces modules privés.
 
-Bridges et pins des modules `deps/*` : un consommateur ne prend pas `deps/<os>_<arch>` dans le commit
-de v8go qu'il requiert, mais dans les versions des modules `deps/*` que le `go.mod` de v8go épingle
-(MVS). botify-ci vérifie les deux :
-- `bridge-fresh` (`tools/check_bridge.sh`) : les bridges de ce commit correspondent aux sources ;
-  le même job vérifie l'absence du shim et l'isolation du runtime C++ (`tools/check_cxx_runtime_isolated.sh`) ;
+## Bridges et pins des modules `deps/*`
+
+Un consommateur ne prend pas `deps/<os>_<arch>` dans le commit de v8go qu'il requiert, mais dans les
+versions des modules `deps/*` que le `go.mod` de v8go épingle (MVS). botify-ci vérifie les deux :
+
+- `bridge-fresh` (`tools/check_bridge.sh`) : chaque module `deps/<os>_<arch>` a son archive de bridge
+  et un `bridge.sha256` égal à `tools/bridge_hash.sh` ; le même job vérifie l'absence du shim et
+  l'isolation du runtime C++ (`tools/check_cxx_runtime_isolated.sh`) ;
 - `pinned-deps-fresh` (`tools/check_pinned_deps.sh`) : les modules `deps/*` épinglés par `go.mod`
-  portent un `bridge.sha256` égal à `tools/bridge_hash.sh`, et `bench/go.mod` épingle les mêmes
-  versions.
+  portent un `bridge.sha256` égal à `tools/bridge_hash.sh`, leur arbre git `deps/<os>_<arch>` est
+  celui de HEAD (ce qui couvre aussi `cgo.go`, les archives V8 et les en-têtes, hors empreinte), et
+  `bench/go.mod` épingle les mêmes versions. Le commit épinglé doit être dans le clone : le job
+  récupère tout l'historique (`fetch-depth: 0`), donc les branches et les tags.
 
-Après toute modification de ce qu'empreinte `tools/bridge_hash.sh` (C++, patchs, `//export`, V8,
-table de renommage du runtime C++, scripts `build_bridge.sh` et `rename_cxx_runtime.sh`) :
-1. pousser. `botify-bridge` reconstruit les bridges (seul pour `*.cc`, `*.h`, `tools/patches/`,
-   `tools/cxx-runtime-rename.map`, ses scripts et
-   `deps/v8_hash` sur une branche autre que master, sinon le lancer à la main) et, si les bridges
-   ne correspondent plus aux sources, pousse sur cette branche un commit
-   « Rebuild prebuilt v8go bridges » (jamais sur master, protégée : passer par une PR). D'ici là,
+`tools/bridge_hash.sh` empreinte les `.cc`/`.h`, les `.go` à `//export`, `cgo.go`, `deps/v8_hash`,
+`.github/actions/setup-clang/action.yml` (version de clang), `tools/build_bridge.sh`,
+`tools/rename_cxx_runtime.sh` et `tools/cxx-runtime-rename.map`. Après une modification de l'un
+d'eux :
+
+1. pousser sur une branche autre que master. `botify-bridge` se déclenche seul pour `*.cc`, `*.h`,
+   `tools/patches/**`, `deps/v8_hash`, `tools/cxx-runtime-rename.map`, `tools/rename_cxx_runtime.sh`,
+   `tools/build_bridge.sh`, `tools/bridge_hash.sh`, `.github/actions/setup-clang/action.yml` et son
+   propre fichier ; pour `cgo.go` ou un `.go` à `//export` seul, `bridge-fresh` échoue : lancer le
+   workflow à la main sur la branche. Si les bridges ne correspondent plus aux sources, il pousse sur
+   cette branche un commit « Rebuild prebuilt v8go bridges ». Le bot ne committe **jamais** sur
+   master, même lancé à la main sur master : tout passe par une branche et une PR. D'ici là,
    `bridge-fresh` et `pinned-deps-fresh` échouent : c'est voulu ;
-2. `git pull`, puis `tools/docker/dev.sh 'tools/pin_deps.sh <sha du commit de bridges>'` ; committer
-   `go.mod`, `go.sum` et `bench/go.mod`, et pousser ;
+2. `git pull`, puis `tools/docker/dev.sh 'tools/pin_deps.sh <commit de bridges>'` (sha complet ou
+   abrégé, ou tag de version, voir l'en-tête du script) ; committer `go.mod`, `go.sum` et
+   `bench/go.mod`, et pousser ;
 3. ce push relance `botify-ci` (le commit du bot n'en déclenche pas) : le commit de pin ne change pas
    le C++, donc `pinned-deps-fresh` passe.
 
 Un pin est obligatoire après chaque reconstruction des bridges, avant de tagger ou de fusionner.
 
-Mettre à jour V8 :
-1. lancer `tools/docker/dev.sh 'tools/sync_tommie.sh <sha>'` (ou le workflow `botify-sync-upstream`) ; il
-   retire le shim, renomme le runtime C++ des archives Linux (table régénérée : committer son diff avec
-   les archives) et finit par `tools/check_cxx_runtime_isolated.sh` ;
-2. lancer le workflow `botify-bridge` sur la branche, puis épingler (`tools/pin_deps.sh`, ci-dessus) ;
-3. vérifier que `botify-ci` passe, `pinned-deps-fresh` compris ;
-4. fusionner par un *merge commit* (pas de squash ni de rebase : `go.mod` référence des commits de
-   la branche). Pour une version : tagger les modules `deps/*` sur ce commit, lancer
-   `tools/pin_deps.sh <commit tagué>` (qui résout alors les tags), pousser, puis tagger le module racine.
+**Commits épinglés et squash.** Les PR sont fusionnées en *squash* (c'est le cas de la PR de la
+montée V8 15.4, pour garder l'historique de travail hors de master) : les commits de la branche, dont
+le commit de bridges épinglé par `go.mod`, ne sont alors plus accessibles depuis master, et un module
+épinglé doit rester accessible (Go le résout par son commit ; `pinned-deps-fresh` le cherche dans le
+clone). Après le squash, refaire donc le pin sur le commit de master, puis, pour une version, sur des
+tags (procédure ci-dessous). Une PR qui ne touche ni au bridge ni à `deps/` n'est pas concernée.
 
-Benchmarks : `tools/docker/dev.sh bench/run.sh`. Migration des consommateurs : `MIGRATION.md`.
-Dépendances cgo des consommateurs (liburlnorm, zstd, igzip…) et nouvelles libs : `CGO-DEPENDENCIES.md`.
+**Protection de master.** master n'est **pas** protégée aujourd'hui. Il est recommandé (action
+d'administrateur du dépôt) de la protéger : passage par PR, et checks requis `bridge-fresh`,
+`pinned-deps-fresh` et les tests par plateforme (`Tests on linux amd64`… `Tests on windows amd64`),
+plus `glibc-floor` et `static-cxx-probe`.
+
+## Publier une version (ex. v0.10.0)
+
+1. **PR verte, squash-merge** : `botify-ci` passe sur la PR, `pinned-deps-fresh` compris ; la
+   fusionner en squash. On obtient le commit **S** sur master, dont les `deps/<os>_<arch>` sont les
+   bridges à jour (S contient le contenu du commit de bridges). Sur S, `pinned-deps-fresh` peut
+   échouer (le commit de bridges épinglé n'est plus sur aucune branche une fois la branche
+   supprimée) : c'est l'étape suivante qui le corrige.
+2. **Tagger les modules `deps/*` sur S**, un tag par module, poussés **un par un, explicitement** :
+
+   ```sh
+   git fetch origin && S=$(git rev-parse origin/master)
+   for d in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64; do
+     git tag "deps/$d/v0.10.0" "$S"
+     git push origin "refs/tags/deps/$d/v0.10.0"
+   done
+   ```
+
+   Jamais `git push --tags` : un clone local peut contenir les tags v0.7.0 à v0.9.0 de rogchap/v8go,
+   absents de ce dépôt, qui seraient publiés avec.
+3. **Épingler les tags** : sur une branche partant de S,
+   `tools/docker/dev.sh 'tools/pin_deps.sh v0.10.0'` (le script vérifie
+   `deps/<os>_<arch>/v0.10.0` pour chaque module, et que son arbre est celui de HEAD), committer
+   `go.mod`, `go.sum`, `bench/go.mod`, ouvrir une PR, attendre `botify-ci` (dont
+   `pinned-deps-fresh`), fusionner : commit **P** sur master. Le pin ne touche pas au C++ : le bridge
+   n'est pas reconstruit.
+4. **Tagger le module racine sur P** : `git tag v0.10.0 <P> && git push origin refs/tags/v0.10.0`.
+
+Les consommateurs requièrent `github.com/botify-labs/v8go v0.10.0`, qui épingle les modules `deps/*`
+à leurs tags : tout reste accessible indépendamment des branches.
+
+## Mettre à jour V8
+
+1. lancer `tools/docker/dev.sh 'tools/sync_tommie.sh <sha>'` (ou le workflow
+   `botify-sync-upstream`) sur une branche ; il retire le shim, renomme le runtime C++ des archives
+   Linux (table régénérée : committer son diff avec les archives), applique les patchs et finit par
+   `tools/check_cxx_runtime_isolated.sh` ;
+2. pousser : `botify-bridge` reconstruit les bridges (sinon le lancer à la main), puis épingler
+   (`tools/pin_deps.sh`, ci-dessus) ;
+3. vérifier que `botify-ci` passe, `pinned-deps-fresh` compris, puis publier (ci-dessus).
+
+## Benchmarks
+
+- `tools/docker/dev.sh bench/run.sh` : baseline (V8 9.0, `../v8go-baseline`) contre la nouvelle
+  version compilée comme chez un consommateur. Sections : `v8go-il` (benchmarks v8go entrelacés :
+  `COUNT` tours d'un passage chacun, `-test.count 1`, l'ordre des deux versions alternant à chaque
+  tour ; c'est ainsi qu'ont été produits les `v8go-il-*.txt` des résultats, dont le −22 % de geomean
+  de `bench/results/2026-10-07-final/summary.md`), `v8go` (`-count` d'affilée par version, sensible
+  aux dérives de la machine), `gojs` et `soak`. Sans argument : `v8go-il`, `soak`, et `gojs` si les
+  checkouts gojs sont configurés.
+- Les sections `gojs` (et le soak gojs) demandent les checkouts d'un consommateur interne et
+  `GH_TOKEN` (transmis au conteneur par `tools/docker/dev.sh`, par exemple
+  `GH_TOKEN=$(gh auth token)`), avec `GOPRIVATE` et les variables `GOJS_*` : voir l'en-tête de
+  `bench/run.sh`. Elles ne sont pas reproductibles hors de Botify.
+- `botify-bench` (workflow manuel) : baseline contre nouvelle version sur macOS (amd64 et arm64),
+  nouvelle version seule sur linux/arm64 et Windows (pas de baseline V8 9.0 pour ces plateformes).
+
+Migration des consommateurs : `MIGRATION.md`. Dépendances cgo des consommateurs et nouvelles libs :
+`CGO-DEPENDENCIES.md`.
 
 ## Piège clang-format
 

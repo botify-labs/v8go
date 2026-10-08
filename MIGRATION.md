@@ -5,7 +5,7 @@
 ```diff
 -replace rogchap.com/v8go => github.com/botify-labs/v8go v0.0.0-20211129082619-6f9829d18985
 -require rogchap.com/v8go v0.6.1-0.20211110211436-d8d94c25bd2b
-+require github.com/botify-labs/v8go <version publiée>
++require github.com/botify-labs/v8go v0.10.0
 ```
 
 ```diff
@@ -13,50 +13,56 @@
 +import v8go "github.com/botify-labs/v8go"
 ```
 
-Pour gojs, c'est le seul changement : l'import. Le reste du code n'a pas bougé.
+Le code existant compile sans autre changement dans la plupart des cas (une seule incompatibilité de
+compilation, §4). Les comportements qui changent sont au §3bis.
 
 ## 2. Toolchain
 
 - **Linux / macOS : aucun changement.** V8 et le bridge C++ de v8go sont livrés précompilés et liés
   en statique ; aucun C++ n'est compilé chez le consommateur (gcc ou clang système, sans flags).
-- **Linux : glibc ≥ 2.34** pour les binaires qui lient le nouveau V8. Amazon Linux 2023 convient ;
-  Amazon Linux 2 n'est plus supporté.
-- **Linux : ce plancher dépend de l'hôte de build.** Les archives V8 référencent des symboles de la
-  libc/libm sans version (`fmod`, etc.) : l'éditeur de liens les lie aux versions par défaut de la
-  glibc de l'hôte qui lie le binaire. Lié sur une glibc ≥ 2.38 (ex. ubuntu-24.04), le binaire exige
-  `fmod@GLIBC_2.38` et ne démarre pas sur Amazon Linux 2023 (glibc 2.34). Lier sur la plus ancienne
-  cible d'exécution, c.-à-d. dans `amazonlinux:2023` (comme cbjsex, et le job `glibc-floor` de
-  botify-ci), ou vérifier le binaire :
-  `objdump -T <binaire> | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1` doit afficher au plus
-  `GLIBC_2.34`. Un lien entièrement statique n'est pas concerné.
+- **Plateformes** : linux amd64/arm64, darwin amd64/arm64, windows amd64. Sous linux/arm64, les
+  libs cgo précompilées du consommateur doivent aussi exister pour arm64 (voir
+  `CGO-DEPENDENCIES.md` §2.5).
+- **Linux : glibc.** Les archives V8 de tommie sont construites contre le sysroot Debian bullseye
+  de Chromium : V8 demande **glibc ≥ 2.31** (plancher annoncé par tommie, non testé par la CI de
+  Botify). La cible d'exécution de Botify est Amazon Linux 2023 (glibc 2.34) : le job `glibc-floor`
+  de botify-ci construit un binaire consommateur dans `amazonlinux:2023` (linux/amd64), vérifie qu'il
+  ne demande pas plus que `GLIBC_2.34` et y lance les tests. Amazon Linux 2 (glibc 2.26) n'est plus
+  supporté.
+- **Linux : le plancher effectif dépend de l'hôte de build.** Les archives V8 référencent des
+  symboles de la libc/libm sans version (`fmod`, etc.) : l'éditeur de liens les lie aux versions par
+  défaut de la glibc de l'hôte qui lie le binaire. Lié sur une glibc ≥ 2.38 (ex. ubuntu-24.04), le
+  binaire exige `fmod@GLIBC_2.38` et ne démarre pas sur Amazon Linux 2023 (glibc 2.34). Lier sur la
+  plus ancienne cible d'exécution (par exemple dans `amazonlinux:2023`, comme le job `glibc-floor`),
+  ou vérifier le binaire :
+  `objdump -T <binaire> | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1` doit afficher au plus la
+  version de la cible (`GLIBC_2.34` pour AL2023). Un lien entièrement statique n'est pas concerné.
 - **Linux, lien totalement statique** (`-extldflags '-static'`) : fonctionne, y compris avec des libs
   C++ construites avec g++/libstdc++ (précompilées ou compilées depuis leurs sources). Le runtime C++
   de V8 (libc++ et libc++abi de Chromium) est renommé dans les archives Linux (suffixe `.v8cr`) : il
   ne définit plus aucun des symboles de libstdc++/libsupc++ (`__cxa_*`, `std::exception`,
-  `operator new`…), chaque runtime garde ses exceptions et son RTTI, sans coût à l'exécution. Le
-  prélink de liburlnorm (`lib/linux/liburlnorm_prelinked.a`), devenu inutile, a donc été retiré de
-  cdf : la liburlnorm d'origine se lie statiquement avec V8. Une nouvelle lib C++ n'a rien à faire.
-  Voir `CGO-DEPENDENCIES.md` §2.2.
+  `operator new`…), chaque runtime garde ses exceptions et son RTTI, sans coût à l'exécution. Une lib
+  C++ n'a donc rien à faire, ni prélink ni masquage de symboles. Voir `CGO-DEPENDENCIES.md` §2.2.
 - **Linux, lien dynamique avec du C++ g++** : le même renommage corrige un défaut des versions
   précédentes de cette branche : le runtime de V8, lié dans l'exécutable, supplantait celui de
   `libstdc++.so`, et une exception levée dans libstdc++ (`std::stoi`…) finissait en `std::terminate`.
-- **Windows amd64** : tout est statique en ABI MSVC.
-  - Go ≥ 1.27, LLVM ≥ 21 (`choco install llvm`), MSVC Build Tools + Windows SDK ;
-  - `CC="clang -fuse-ld=lld"` et `CXX="clang++ -fuse-ld=lld"` ;
-  - les packages cgo compilés depuis leurs sources n'ont rien à faire ; les libs précompilées en
-    MinGW doivent être recompilées en MSVC `/MT` (voir `docs/superpowers/cgo-inventory.md`) :
-    - liburlnorm : `lib/windows_msvc`, fourni à partir de la version publiée avec cette migration ;
-    - igzip (cdf et pulse) : `igzip.lib` à côté de `libigzip.a` ;
-    - zstd de gocdf : `zstd_windows.lib` à côté de `libzstd_windows.a` (botify-hq/gocdf#926, à
-      publier en v3.19.12). **pulse** requiert gocdf v3.16.16, qui n'a que la lib MinGW : ses builds
-      Windows natifs (local tester…) ne lient plus tant que gocdf#926 n'est pas fusionnée et taguée,
-      puis `gocdf/v3` montée dans pulse. Linux n'est pas concerné. De même pour ftl s'il est un
-      jour construit sous Windows (gocdf v3.19.11, et cdf `go/pkg` sans `igzip.lib` avant son
-      prochain tag).
-  - Avec clang ciblant MSVC, `-lfoo` résout `foo.lib` : les `.lib` MSVC peuvent coexister avec les
-    `.a` MinGW sans changer les LDFLAGS.
-- **Autres dépendances cgo** (pourquoi liburlnorm, zstd et igzip ont dû être recompilées, et comment
-  traiter une nouvelle lib) : voir `CGO-DEPENDENCIES.md`.
+- **Windows amd64** : tout est statique en ABI MSVC (CRT statique `/MT`). **MinGW n'est pas
+  supporté.**
+  - Go ≥ 1.27, LLVM ≥ 21 (clang ciblant MSVC, par exemple `choco install llvm`), MSVC Build Tools +
+    Windows SDK ;
+  - `CC="clang -fuse-ld=lld"` et `CXX="clang++ -fuse-ld=lld"`. `-fuse-ld=lld` doit être dans `CC`
+    (ou passé par `-ldflags=-extldflags=-fuse-ld=lld`) : c'est ainsi que Go détecte LLD, sinon il
+    passe des flags que seul GNU ld accepte ;
+  - clang doit être dans le `PATH` : Go découpe `CC` sur les espaces, un chemin complet
+    (`C:\Program Files\LLVM\bin\clang.exe`) ne fonctionne pas ;
+  - les packages cgo compilés depuis leurs sources sont recompilés par clang ciblant MSVC. La plupart
+    du C passe tel quel, mais le code propre à GCC/MinGW peut échouer (`pthread.h`, `unistd.h`,
+    extensions `__attribute__`, en-têtes réservés à MinGW) : à vérifier pour chaque dépendance ;
+  - les libs précompilées en MinGW (`.a`) doivent être recompilées en MSVC `/MT` (`.lib`). Avec clang
+    ciblant MSVC, `-lfoo` résout `foo.lib` : la `.lib` peut être placée à côté de la `.a` MinGW sans
+    changer les `LDFLAGS`. Voir `CGO-DEPENDENCIES.md` §3.
+- **Autres dépendances cgo** (pourquoi certaines libs précompilées ont dû être recompilées, et
+  comment traiter une nouvelle lib) : voir `CGO-DEPENDENCIES.md`.
 - **Développer v8go lui-même** : `-tags v8go_source`, clang ≥ 21, `CGO_CXXFLAGS=-nostdinc++`.
   Voir `BOTIFY.md`.
 
@@ -64,7 +70,8 @@ Pour gojs, c'est le seul changement : l'import. Le reste du code n'a pas bougé.
 
 - **RSS plus élevé.** V8 15 consomme plus de mémoire que V8 9.0
   (`bench/results/2026-10-06-noshim/summary.md`, linux/amd64) :
-  - environ **+13,5 Mio de RSS pic par worker gojs** (45,9 → 59,4 Mio, +29 %, soak gojs 100k) ;
+  - environ **+13,5 Mio de RSS pic par worker gojs**, un consommateur interne (45,9 → 59,4 Mio,
+    +29 %, soak gojs 100k) ;
   - environ **+32 Mio de plateau par isolate long-lived** (soak v8go, un isolate et un contexte
     réutilisés : ~72 → ~104 Mio).
 
@@ -87,28 +94,55 @@ Pour gojs, c'est le seul changement : l'import. Le reste du code n'a pas bougé.
 
 - `Isolate.Cleanup()` et `Context.Cleanup()` gardent la même API. Les valeurs Go encore
   référencées par JS sont désormais conservées jusqu'à leur collecte par V8.
-- Intl/ICU est disponible (ICU 78 interne à V8, indépendante de l'ICU 65 de liburlnorm).
+- `Isolate.Cleanup()` n'exécute jamais de JS ni de callback Go (§3bis) : comme avec l'ancien fork, les
+  callbacks `FinalizationRegistry` ne s'exécutent jamais.
 - `FunctionCallback` et `NewFunctionTemplate` sont inchangés : les callbacks existants compilent
   tels quels. Aucun test de la baseline n'a été supprimé.
+- Le `malloc` du processus reste celui de la glibc (ou du système : zone par défaut sous macOS, UCRT
+  sous Windows) pour tout le code C/C++ du consommateur, comme avec la baseline. Les libs V8
+  précompilées de tommie embarquent l'*allocator shim* de PartitionAlloc, qui remplacerait
+  `malloc`/`free`/`new`/`delete` pour tout le binaire : il est retiré à l'import
+  (`tools/sync_tommie.sh`), et `tools/check_no_allocator_shim.sh` le vérifie.
 
 ## 3bis. Comportements modifiés
 
-- `Isolate.Cleanup()` exécute d'abord les tâches que V8 a postées pour l'isolate (GC : memory
-  reducer, etc. ; callbacks `FinalizationRegistry`), que v8go n'exécute nulle part ailleurs. Sans
-  cela, un isolate long-lived accumulait ces tâches en mémoire native et ne lançait un GC majeur
-  qu'à sa limite initiale (fuite du soak, Task 12a). Conséquences :
-  - du JS, et les callbacks Go qu'il appelle, peuvent s'exécuter pendant `Cleanup()` ;
-  - ne pas appeler `Cleanup()` depuis un `FunctionCallback` ni pendant que du JS s'exécute ;
-  - re-récupérer `Undefined(iso)` / `Null(iso)` après `Cleanup()` ;
-  - un `TerminateExecution` (watchdog) ou le callback de limite de heap peut prendre effet pendant
-    `Cleanup()` et affecter le `RunScript` suivant.
-- V8 n'installe plus PartitionAlloc comme `malloc` du processus. Les libs V8 précompilées de
-  tommie embarquent l'*allocator shim* de PartitionAlloc, qui remplace `malloc`/`free`/`new`/`delete`
-  pour tout le binaire consommateur. Il est retiré à l'import (`tools/sync_tommie.sh`). Le `malloc`
-  de la glibc (ou du système : zone par défaut sous macOS, UCRT sous Windows) reste donc en place
-  pour tout le code C/C++ du consommateur (cgo, liburlnorm, zstd, igzip…), comme avec la baseline.
-  `tools/check_no_allocator_shim.sh` le vérifie.
-- Chemin JS→Go (Task 25, `bench/results/2026-10-07-callback/callback-perf.md`) :
+- **`Isolate.Cleanup()` exécute les tâches que V8 a postées pour l'isolate** (GC : memory reducer,
+  etc.), que v8go n'exécute nulle part ailleurs. Sans cela, un isolate long-lived accumulait ces
+  tâches en mémoire native et ne lançait un GC majeur qu'à sa limite initiale. L'appeler
+  régulièrement sur un isolate long-lived. Pendant `Cleanup()` :
+  - aucun JS ni callback Go ne s'exécute : le JS qu'une tâche lancerait (callbacks
+    `FinalizationRegistry`) est interrompu avant sa première instruction, et un callback de fonction
+    renvoie `undefined` sans appeler Go ;
+  - un `TerminateExecution` demandé pendant `Cleanup()` (watchdog sur une autre goroutine) est
+    annulé : le script suivant s'exécute normalement.
+- **Les deux `Cleanup()` ne font rien s'ils sont appelés avec du JS sur la pile** (depuis un
+  `FunctionCallback`, ou pendant qu'un script s'exécute sur l'isolate) : ils libéreraient les valeurs
+  des appels en cours. Les appeler une fois le script terminé.
+- `Undefined(iso)` et `Null(iso)` obtenues avant `Isolate.Cleanup()` ne doivent plus être utilisées
+  après : `Cleanup` libère les valeurs de l'isolate et les recrée, les re-récupérer.
+- **Fonction d'un `Context` fermé** : une fonction Go d'un contexte fermé (`Close`), encore
+  référencée par JS (passée à un autre contexte, par exemple), lève `Error: v8go: context closed`
+  quand elle est appelée. L'`Error` vient du realm du contexte fermé : `e instanceof Error` est faux
+  dans le contexte appelant ; tester `e.message`.
+- **Terminaison et callbacks imbriqués** : un callback Go qui renvoie l'erreur d'un script imbriqué
+  terminé (`TerminateExecution`, limite de heap) laisse la terminaison se propager jusqu'au script
+  de plus haut niveau, au lieu de la relancer comme une exception que le JS pourrait attraper.
+- **Limite de heap** : elle n'arrête plus le processus (§4). Quand la limite approche, le callback de
+  v8go relève la limite pour que V8 puisse interrompre le script proprement ; le script reçoit une
+  erreur `ExecutionTerminated: heap limit reached` (`errors.Is(err, v8go.ErrHeapLimitReached)`), et la
+  limite initiale est restaurée. L'isolate reste utilisable, mais l'état JS laissé par le script
+  interrompu est indéterminé : recycler l'isolate (le disposer et en créer un autre) est recommandé.
+- **Intl/ICU activé.** L'ancien fork était compilé sans i18n ; V8 embarque désormais son ICU (ICU 78,
+  symboles suffixés `_78`, qui cohabitent avec une autre ICU liée par le consommateur). `Intl`,
+  `toLocaleString`, `localeCompare`, `toLocaleDateString`, le nom du fuseau dans
+  `Date.prototype.toString`… dépendent alors de l'hôte :
+  - la locale par défaut vient de l'environnement (`LC_ALL`, `LC_MESSAGES` ou `LANG` sous Linux et
+    macOS, réglages de l'utilisateur sous Windows) : le même script donne `1,234,567.891` sur un hôte
+    et `1 234 567,891` sur un autre. Pour un résultat stable, appeler `v8go.SetDefaultLocale("en_US")`
+    (par exemple) une fois, **avant de créer le premier isolate** ; elle vaut pour tout le processus ;
+  - le fuseau horaire est lu une fois par processus : `TZ`, sinon `/etc/localtime` (Linux et macOS),
+    réglages du système sous Windows. `SetDefaultLocale` ne le change pas.
+- **Chemin JS→Go** (`bench/results/2026-10-07-callback/callback-perf.md`) :
   - fermer un `Context` (`Close`) **avant** de disposer son `Isolate` : un `Close` après `Dispose`,
     déjà invalide, prend maintenant le verrou d'un isolate libéré (comportement indéfini, en
     pratique plutôt un plantage qu'une corruption silencieuse) ;
@@ -123,7 +157,7 @@ Pour gojs, c'est le seul changement : l'import. Le reste du code n'a pas bougé.
 
 ## 4. Changements d'API
 
-Source : `docs/superpowers/apidiff-6f9829d-to-tommie.txt` (`apidiff -incompatible`, une seule
+Source : `docs/apidiff-6f9829d-to-tommie.txt` (`apidiff -incompatible`, une seule
 incompatibilité de compilation) et comparaison des tests de la baseline avec les nouveaux (comportements).
 
 | Avant (6f9829d) | Après | Adaptation |
@@ -142,4 +176,4 @@ Ajouts sans impact sur les consommateurs existants (listés par `apidiff`) : `Is
 `Object` et `ObjectTemplate` (`SetSymbol`, `GetSymbol`, `HasSymbol`, `DeleteSymbol`), `Value.AsSymbol`,
 `Value.AsException`, `Value.External`, `Value.StrictEquals`, `Value.TypeOf`, `NewError` et variantes,
 `Inspector`, `Promise.ThenWithError` / `CatchWithError`, `JSError.ExceptionMessage` / `Unwrap`,
-`FunctionTemplate.Inherit` / `InstanceTemplate` / `PrototypeTemplate`, etc.
+`FunctionTemplate.Inherit` / `InstanceTemplate` / `PrototypeTemplate`, etc. Ajout propre à Botify : `SetDefaultLocale` (§3bis).

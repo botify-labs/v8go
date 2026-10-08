@@ -4,6 +4,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+This file is Botify-owned (`tools/botify-owned.txt`): `tools/sync_tommie.sh` doesn't overwrite it.
+The Botify releases of `github.com/botify-labs/v8go` come first. Below them, from
+"tommie/v8go history" on, is tommie/v8go's changelog as of the imported snapshot
+(`deps/tommie_sha`); its version numbers are tommie's tags, not this module's (tommie's v0.10.0 of
+2023-12-29 is unrelated to Botify's v0.10.0). Copy new upstream entries by hand when syncing.
+For consumers of the old Botify fork (`rogchap.com/v8go`, V8 9.0), [MIGRATION.md](MIGRATION.md)
+lists every change in detail.
+
+## Botify releases
+
+### [v0.10.0] - unreleased
+
+First release of the module `github.com/botify-labs/v8go`, replacing the Botify fork of
+`rogchap.com/v8go` at 6f9829d (V8 9.0).
+
+#### Changed
+- Based on tommie/v8go 0ffc991 (V8 15.4.80.20, tommie's unreleased changes after v0.37.0 included),
+  renamed to `github.com/botify-labs/v8go`. Platforms: linux amd64/arm64, darwin amd64/arm64,
+  windows amd64 (MSVC-target clang with LLD, Go 1.27 or newer). Android is dropped.
+- The C++ bridge ships prebuilt in the `deps/<os>_<arch>` modules: consumers need no C++ toolchain
+  and no `CGO_CXXFLAGS` on Linux and macOS. Building the C++ sources takes `-tags v8go_source`.
+- Reaching the heap limit terminates the script with `ErrHeapLimitReached` instead of aborting the
+  process.
+- Intl is enabled (the old fork was built without i18n): locale-sensitive output depends on the host
+  unless `SetDefaultLocale` is called.
+- Linux glibc: V8 needs 2.31 or newer; CI checks binaries linked on Amazon Linux 2023 need at most
+  `GLIBC_2.34`.
+
+#### Added
+- `Isolate.Cleanup` and `Context.Cleanup`, carried over from the old fork. `Isolate.Cleanup` also runs
+  V8's pending GC tasks; it never runs JavaScript or Go callbacks, cancels a termination requested
+  while it runs, and both do nothing when called with JavaScript on the stack.
+- `SetDefaultLocale`, to pin the default locale of V8's ICU process-wide.
+
+#### Fixed
+- V8's C++ runtime (Chromium's libc++abi/libc++ ABI layer) no longer clashes with g++/libstdc++ code
+  on Linux: it is renamed in the Linux archives, so fully static binaries link and exceptions thrown
+  in libstdc++ no longer end in `std::terminate`.
+- PartitionAlloc's allocator shim is removed from V8's archives: the process keeps the system
+  `malloc`.
+- Calling a function of a closed `Context` throws `Error: v8go: context closed` instead of crashing.
+- A Go callback returning the error of a terminated nested script keeps the termination going,
+  instead of turning it into a catchable exception.
+- JS→Go calls are faster (about −57% on bursts of calls, see `bench/results/2026-10-07-final/`).
+
+## tommie/v8go history
+
 ## [Unreleased]
 
 ### Added
