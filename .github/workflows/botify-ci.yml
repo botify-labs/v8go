@@ -1,8 +1,10 @@
 name: Botify CI
 
+# Pushes to master, and PRs (each push to a PR's branch). A branch without a
+# PR: run it by hand.
 on:
   push:
-    branches: [master, upgrade-v8]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 

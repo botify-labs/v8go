@@ -7,12 +7,18 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   lient `deps/<os>_<arch>/libv8go.a` (`v8go.lib` sous Windows), produit par `tools/build_bridge.sh`.
   `tools/check_bridge.sh` vérifie qu'il correspond aux sources.
 - `cleanup.*` : `Isolate.Cleanup()` / `Context.Cleanup()`. `Isolate.Cleanup()` exécute les tâches
-  que V8 a postées pour l'isolate (GC, memory reducer), sans jamais exécuter de JS ni de callback
-  Go : chaque tâche est précédée d'une demande de terminaison, le JS qu'elle lancerait (callbacks
-  `FinalizationRegistry`) est interrompu avant sa première instruction, les callbacks de fonction
-  renvoient `undefined` sans appeler Go, et la terminaison est annulée ensuite (un
-  `TerminateExecution` demandé pendant `Cleanup` l'est aussi). Les deux `Cleanup` ne font rien s'ils
-  sont appelés avec du JS sur la pile (depuis un `FunctionCallback`). Le RSS d'un isolate
+  que V8 a postées pour l'isolate (GC, memory reducer, tâches qui règlent des promesses : compilation
+  wasm, `Atomics.waitAsync`), sans jamais exécuter de JS ni de callback Go : chaque tâche est
+  précédée d'une demande de terminaison, le JS qu'elle lancerait (callbacks `FinalizationRegistry`)
+  est interrompu avant sa première instruction, et pendant la pompe (`botify_cleanup_isolate`,
+  `botify_context.h`) les callbacks de fonction renvoient `undefined` sans appeler Go, le
+  `PromiseRejectedCallback` et les messages console de l'inspecteur ne font rien (patchs 0005 et
+  0006). Un checkpoint de microtâches, terminaison demandée, vide ensuite la file : les réactions
+  des promesses que les tâches ont réglées ne s'exécutent pas au script suivant. La terminaison est
+  enfin annulée (un `TerminateExecution` demandé pendant `Cleanup` l'est aussi), et l'état de limite
+  de heap remis à zéro (`Isolate.HeapLimitReached`, patch 0007). Les deux `Cleanup` ne font rien
+  s'ils sont appelés avec du JS de l'isolate sur la pile du thread appelant (depuis un
+  `FunctionCallback`) ; depuis une autre goroutine, ils attendent le `Locker`. Le RSS d'un isolate
   long-lived ne plafonne que grâce au timer du memory reducer de V8 (≥ 8 s) : un soak
   (`bench/soak_test.go`) doit durer assez longtemps pour qu'il se déclenche. Le job `soak` de
   botify-ci en lance 30 000 itérations (environ 9 s sur ubuntu-24.04) et vérifie une croissance du RSS
@@ -76,8 +82,15 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   callback Go qui renvoie l'erreur d'un script imbriqué terminé laisse la terminaison se propager au
   lieu de la relancer comme exception attrapable ; pendant `Isolate.Cleanup`, les callbacks renvoient
   `undefined` sans appeler Go.
+- **Pompe de `Cleanup` et limite de heap** (`tools/patches/0006-cleanup-pump-guards.patch`,
+  `tools/patches/0007-heap-limit.patch`) : pendant `Isolate.Cleanup`, le `PromiseRejectedCallback`
+  et les messages console de l'inspecteur n'appellent pas Go. La limite de heap atteinte par un
+  script imbriqué (lancé par un callback Go) est signalée (`ErrHeapLimitReached`) au script imbriqué
+  et au script de plus haut niveau : le drapeau n'est consommé qu'à la profondeur d'appel nulle
+  (`ExceptionError`). `Isolate.Cleanup` l'efface, ainsi que celui de `Isolate.HeapLimitReached`.
 - **Patchs des fichiers de tommie** : les modifications des fichiers de tommie (chemin JS→Go,
-  garde-fous) sont des patchs, `tools/patches/*.patch` (0001 à 0005), que `tools/sync_tommie.sh`
+  garde-fous, pompe de `Cleanup`, limite de heap) sont des patchs, `tools/patches/*.patch` (0001 à
+  0007), que `tools/sync_tommie.sh`
   applique dans l'ordre après l'import : il s'arrête si l'un d'eux ne s'applique plus, en laissant
   appliqués les précédents. Le régénérer alors contre cet état : `git add -A` (sans committer), refaire
   la modification à la main, puis `git diff -- <fichiers modifiés> > tools/patches/<patch>`, et
@@ -129,8 +142,10 @@ d'eux :
 2. `git pull`, puis `tools/docker/dev.sh 'tools/pin_deps.sh <commit de bridges>'` (sha complet ou
    abrégé, ou tag de version, voir l'en-tête du script) ; committer `go.mod`, `go.sum` et
    `bench/go.mod`, et pousser ;
-3. ce push relance `botify-ci` (le commit du bot n'en déclenche pas) : le commit de pin ne change pas
-   le C++, donc `pinned-deps-fresh` passe.
+3. `botify-ci` tourne sur les PR (`pull_request`) et sur les push sur master : ce push relance donc
+   `botify-ci` sur la PR ouverte pour la branche (sans PR, le lancer à la main,
+   `workflow_dispatch`) ; le commit du bot, poussé avec le `GITHUB_TOKEN`, n'en déclenche pas. Le
+   commit de pin ne change pas le C++, donc `pinned-deps-fresh` passe.
 
 Un pin est obligatoire après chaque reconstruction des bridges, avant de tagger ou de fusionner.
 
@@ -142,14 +157,28 @@ clone). Après le squash, refaire donc le pin sur le commit de master, puis, pou
 tags (procédure ci-dessous). Une PR qui ne touche ni au bridge ni à `deps/` n'est pas concernée.
 
 **Protection de master.** master n'est **pas** protégée aujourd'hui. Il est recommandé (action
-d'administrateur du dépôt) de la protéger : passage par PR, et checks requis `bridge-fresh`,
-`pinned-deps-fresh` et les tests par plateforme (`Tests on linux amd64`… `Tests on windows amd64`),
-plus `glibc-floor` et `static-cxx-probe`.
+d'administrateur du dépôt) de la protéger : passage par PR, et checks requis, sous leurs noms
+affichés (ceux de `botify-ci.yml`) :
+
+- `Prebuilt bridges match sources` (`bridge-fresh`) ;
+- `Pinned deps modules carry the current bridges` (`pinned-deps-fresh`) ;
+- `Tests on linux amd64`, `Tests on linux arm64`, `Tests on darwin amd64`, `Tests on darwin arm64`,
+  `Tests on windows amd64` ;
+- `Consumer build and tests on Amazon Linux 2023 (at most GLIBC_2.34)` (`glibc-floor`) ;
+- `Fully static binary with g++ C++ code on linux amd64` et
+  `Fully static binary with g++ C++ code on linux arm64` (`static-cxx-probe`) ;
+- éventuellement `LeakSanitizer (source mode)` et `Cleanup soak (consumer mode)`.
 
 ## Publier une version (ex. v0.10.0)
 
 1. **PR verte, squash-merge** : `botify-ci` passe sur la PR, `pinned-deps-fresh` compris ; la
-   fusionner en squash. On obtient le commit **S** sur master, dont les `deps/<os>_<arch>` sont les
+   fusionner en squash, en **remplaçant le message proposé** par le titre de la PR et un corps court
+   et propre (ce que la PR change, sans l'historique de travail). Le message par défaut concatène
+   les messages de tous les commits de la branche (réglage `squash_merge_commit_message` =
+   `COMMIT_MESSAGES` du dépôt) : sur une longue branche, des dizaines de messages de travail
+   arriveraient sur master, dépôt public. Il est recommandé (action d'administrateur du dépôt) de
+   régler `squash_merge_commit_title` = `PR_TITLE` et `squash_merge_commit_message` = `PR_BODY`.
+   On obtient le commit **S** sur master, dont les `deps/<os>_<arch>` sont les
    bridges à jour (S contient le contenu du commit de bridges). Sur S, `pinned-deps-fresh` peut
    échouer (le commit de bridges épinglé n'est plus sur aucune branche une fois la branche
    supprimée) : c'est l'étape suivante qui le corrige.
@@ -181,9 +210,14 @@ Les consommateurs requièrent `github.com/botify-labs/v8go v0.10.0`, qui épingl
 1. lancer `tools/docker/dev.sh 'tools/sync_tommie.sh <sha>'` (ou le workflow
    `botify-sync-upstream`) sur une branche ; il retire le shim, renomme le runtime C++ des archives
    Linux (table régénérée : committer son diff avec les archives), applique les patchs et finit par
-   `tools/check_cxx_runtime_isolated.sh` ;
+   `tools/check_cxx_runtime_isolated.sh`. Il remet dans `go.mod` les pins Botify des modules
+   `deps/*` d'avant l'import (ceux de tommie désignent des commits de tommie, inexistants ici), donc
+   les bridges précédents, jusqu'au pin de l'étape 2 ; `go.sum` garde les lignes Botify de ces pins,
+   plus celles de tommie pour les modules tiers (`pin_deps.sh` le range avec `go mod tidy`). Il
+   supprime aussi `.github/FUNDING.yml` et `.github/actions/checkout-depot-tools` de tommie ;
 2. pousser : `botify-bridge` reconstruit les bridges (sinon le lancer à la main), puis épingler
-   (`tools/pin_deps.sh`, ci-dessus) ;
+   (`tools/pin_deps.sh`, ci-dessus) le commit de bridges, ou le commit d'import lui-même si aucune
+   entrée du bridge n'a changé (pas de commit de bridges) ;
 3. vérifier que `botify-ci` passe, `pinned-deps-fresh` compris, puis publier (ci-dessus).
 
 ## Benchmarks

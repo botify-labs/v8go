@@ -56,11 +56,18 @@ for gomod in deps/*_*/go.mod; do
   fi
 done
 
+# All versions first, then the edits: a failed lookup leaves go.mod and
+# bench/go.mod untouched rather than half-pinned.
+pins=()
 for gomod in deps/*_*/go.mod; do
   mod="github.com/botify-labs/v8go/$(dirname "$gomod")"
   ver=$(go list -m -f '{{.Version}}' "$mod@$(query)")
-  go mod edit -require="$mod@$ver"
-  go mod edit -require="$mod@$ver" bench/go.mod
-  echo "$mod $ver"
+  [ -n "$ver" ] || { echo "$mod@$(query): no version" >&2; exit 1; }
+  pins+=("$mod@$ver")
+done
+for pin in "${pins[@]}"; do
+  go mod edit -require="$pin"
+  go mod edit -require="$pin" bench/go.mod
+  echo "$pin"
 done
 go mod tidy

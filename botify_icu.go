@@ -3,7 +3,7 @@ package v8go
 // /* V8's ICU is linked in from the deps libraries, with its symbols suffixed
 //    by its major version. A V8 upgrade that changes the ICU version makes
 //    the link fail on this symbol: update the suffix to the one that
-//    nm deps/linux_amd64/libv8.a | grep 'T uloc_setDefault' shows. */
+//    nm deps/linux_amd64/libv8-*.a | grep 'T uloc_setDefault' shows. */
 // #include <stdlib.h>
 //
 // typedef int UErrorCode;

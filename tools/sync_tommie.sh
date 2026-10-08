@@ -22,10 +22,21 @@ git -C "$SRC" checkout -q FETCH_HEAD
 EXEC=$(cd "$SRC" && find . -type f -perm -u+x ! -path './.git/*' | sed 's#^\./##')
 rm -rf "$SRC/.git"
 
+# Botify's pins of its deps/<os>_<arch> modules, and their go.sum lines:
+# tommie's go.mod pins tommie's own commits, which don't exist under
+# github.com/botify-labs/v8go. They are put back after the import: go.mod keeps
+# pinning the previous bridges until tools/pin_deps.sh pins the new ones.
+PINS=$(grep -oE 'github\.com/botify-labs/v8go/deps/[a-z0-9_]+ v[^ ]+' "$ROOT/go.mod" | tr ' \n' '@ ')
+grep -E '^github\.com/botify-labs/v8go/deps/' "$ROOT/go.sum" >"$SRC.go.sum"
+trap 'rm -rf "$SRC" "$SRC.go.sum"' EXIT
+
 rsync -a --delete --exclude-from="$ROOT/tools/botify-owned.txt" "$SRC/" "$ROOT/"
 
 cd "$ROOT"
-rm -rf .gitmodules deps/v8 deps/depot_tools .fossa.yml
+# Also tommie's sponsorship page, and the action that checks out depot_tools
+# for tommie's V8 build workflows (not imported).
+rm -rf .gitmodules deps/v8 deps/depot_tools .fossa.yml .github/FUNDING.yml \
+  .github/actions/checkout-depot-tools
 # All of tommie's workflows (test, fmt, leakcheck, vendor, v8build, v8upgrade,
 # release...): only botify-*.yml run here.
 find .github/workflows -maxdepth 1 -type f ! -name 'botify-*' -exec rm -f {} +
@@ -39,6 +50,29 @@ grep -rlZ -e 'github.com/tommie/v8go' \
 go mod edit \
   -droprequire=github.com/botify-labs/v8go/deps/android_amd64 \
   -droprequire=github.com/botify-labs/v8go/deps/android_arm64
+
+# Botify's pins back (PINS above). A deps module Botify doesn't pin (a new
+# platform of tommie's) can't keep tommie's pin: it is dropped, to be pinned
+# once its bridge exists.
+for mod in $(grep -oE 'github\.com/botify-labs/v8go/deps/[a-z0-9_]+ ' go.mod | sort -u); do
+  case " $PINS " in
+  *" $mod@"*) ;;
+  *)
+    echo "warning: Botify doesn't pin $mod: dropped from go.mod" >&2
+    go mod edit -droprequire="$mod"
+    ;;
+  esac
+done
+for pin in $PINS; do
+  go mod edit -require="$pin"
+done
+# go.sum: Botify's lines for those pins, and tommie's for the third-party
+# modules; none for tommie's own modules. tools/pin_deps.sh tidies it.
+{
+  cat "$SRC.go.sum"
+  grep -vE '^github\.com/(tommie|botify-labs)/v8go[/ ]' go.sum || true
+} | LC_ALL=C sort -u >go.sum.new
+mv go.sum.new go.sum
 
 # The tag sits between clang-format off/on markers: clang-format would rewrite
 # a bare first-line `//go:build` into `// go:build`, which silently drops the

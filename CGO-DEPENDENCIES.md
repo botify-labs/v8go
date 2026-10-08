@@ -81,8 +81,8 @@ liburlnorm + V8 en `-static`) :
 ```
 
 **Isolation du runtime C++ de V8** (modules `deps/linux_*` à partir de
-`v0.0.0-20261007203548-1be5d95a805e` ; le `go.mod` de v8go épingle `v0.0.0-20261007211632-a0cb852caccf`,
-puis `v0.10.0` à la publication) : dans les archives Linux (`libv8-*.a`, `libc++-cr.a`,
+`v0.0.0-20261007203548-1be5d95a805e`, donc dans toutes les versions que le `go.mod` de v8go épingle
+depuis, `v0.10.0` à la publication) : dans les archives Linux (`libv8-*.a`, `libc++-cr.a`,
 `libc++abi-cr.a`, le bridge `libv8go.a`), tous ces symboles sont **renommés**, définitions et
 références, avec le suffixe `.v8cr` (`objcopy --redefine-syms`) :
 

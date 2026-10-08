@@ -42,7 +42,13 @@ for gomod in deps/*_*/go.mod; do
     fail=1
   fi
   # Downloading also checks the module against go.sum.
-  dir=$(go mod download -json "$mod@$ver" | grep -oE '"Dir": "[^"]+"' | cut -d'"' -f4)
+  if ! json=$(go mod download -json "$mod@$ver"); then
+    echo "$mod@$ver: go mod download failed:" >&2
+    echo "$json" | grep -E '"Error"' >&2 || echo "$json" >&2
+    fail=1
+    continue
+  fi
+  dir=$(echo "$json" | grep -oE '"Dir": "[^"]+"' | cut -d'"' -f4)
   got=$(cat "$dir/bridge.sha256" 2>/dev/null || echo missing)
   if [ "$got" != "$want" ]; then
     echo "stale pin: $mod@$ver carries bridge $got, the sources are $want:" \

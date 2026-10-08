@@ -50,8 +50,8 @@ jobs:
         title: Sync tommie/v8go@${{ steps.sha.outputs.sha }}
         commit-message: Import tommie/v8go@${{ steps.sha.outputs.sha }}
         body: |
-          Automated import by tools/sync_tommie.sh.
-          1. Run the "Botify Bridge" workflow on this branch (the prebuilt bridges are stale until then).
-          2. Before merging, on this branch: tools/pin_deps.sh <sha of the bridge commit>, then commit go.mod, go.sum and bench/go.mod (BOTIFY.md).
+          Automated import by tools/sync_tommie.sh. go.mod keeps Botify's pins of the deps/* modules (the previous bridges).
+          1. Run the "Botify Bridge" workflow on this branch (this workflow's commit triggers no other workflow). It commits "Rebuild prebuilt v8go bridges" when the bridges are stale; a sync that changes no bridge input gets no bridge commit.
+          2. Then, on this branch: tools/pin_deps.sh <full sha of the bridge commit>, or of the import commit itself when there is no bridge commit; commit go.mod, go.sum and bench/go.mod, and push (that push triggers Botify CI) (BOTIFY.md).
           3. Botify CI must pass, pinned-deps-fresh included: consumer and source tests on 5 targets, LeakSanitizer, Cleanup soak.
-          4. Merge with a merge commit (no squash or rebase: go.mod references this branch's commits).
+          4. Squash-merge, replacing the squash commit message with the PR title and a short body, then re-pin on master's commit (BOTIFY.md, "Commits épinglés et squash" and "Publier une version").
