@@ -459,3 +459,183 @@ func TestCleanupInsideFunctionCallbackIsNoop(t *testing.T) {
 		t.Errorf("Isolate.Cleanup outside a callback: %d internal values left (%d before)", n, isoBefore)
 	}
 }
+
+// pumpUntilSettled calls Isolate.Cleanup until the promises returned by setup,
+// an array, are settled: they are settled by V8 tasks (wasm compilation,
+// Atomics.waitAsync timeouts) that only Cleanup runs. inCleanup is set while
+// Cleanup runs.
+func pumpUntilSettled(t *testing.T, iso *v8.Isolate, ctx *v8.Context, setup string, inCleanup *bool) {
+	t.Helper()
+	v, err := ctx.RunScript(setup, "setup.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	arr, err := v.AsObject()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var promises []*v8.Promise
+	for i := uint32(0); ; i++ {
+		e, err := arr.GetIdx(i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e.IsUndefined() {
+			break
+		}
+		p, err := e.AsPromise()
+		if err != nil {
+			t.Fatal(err)
+		}
+		promises = append(promises, p)
+	}
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		*inCleanup = true
+		iso.Cleanup()
+		*inCleanup = false
+		pending := 0
+		for _, p := range promises {
+			if p.State() == v8.Pending {
+				pending++
+			}
+		}
+		if pending == 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d promises still pending", pending)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// A wasm compilation is rejected by a V8 task, which Cleanup runs: the Go
+// PromiseRejectedCallback isn't called then.
+func TestIsolateCleanupDoesNotCallPromiseRejectedCallback(t *testing.T) {
+	t.Parallel()
+	iso := v8.NewIsolate()
+	defer iso.Dispose()
+	var inCleanup bool
+	calls := 0
+	iso.SetPromiseRejectedCallback(func(v8.PromiseRejectMessage) {
+		if inCleanup {
+			calls++
+		}
+	})
+	ctx := v8.NewContext(iso)
+	defer ctx.Close()
+
+	pumpUntilSettled(t, iso, ctx, `[WebAssembly.compile(new Uint8Array([1, 2, 3, 4]))]`, &inCleanup)
+	if calls != 0 {
+		t.Fatalf("Isolate.Cleanup called the PromiseRejectedCallback %d times", calls)
+	}
+}
+
+// console.log, a C++ builtin, as FinalizationRegistry callback: no
+// JavaScript runs, so the termination doesn't stop it, but the inspector's Go
+// handler isn't called.
+func TestIsolateCleanupDoesNotCallConsoleAPIMessageHandler(t *testing.T) {
+	t.Parallel()
+	recorder := consoleAPIMessageRecorder{}
+	iso := NewIsolateWithInspectorClient(&recorder)
+	defer iso.Dispose()
+	ctx := iso.NewContext()
+	defer ctx.Dispose()
+
+	collectRegistryTarget(t, iso.iso, ctx.Context, `var r = new FinalizationRegistry(console.log);
+(function () { for (let i = 0; i < 3; i++) r.register({}, "held" + i); })();`)
+	iso.iso.Cleanup()
+	if n := len(recorder.messages); n != 0 {
+		t.Fatalf("Isolate.Cleanup called the console API message handler %d times: %v", n, recorder.messages)
+	}
+}
+
+// A Cleanup of another isolate, from a Go callback the pump would call, must
+// not unguard the rest of the pump.
+func TestNestedIsolateCleanupDuringCleanup(t *testing.T) {
+	t.Parallel()
+	isoA := v8.NewIsolate()
+	defer isoA.Dispose()
+	isoB := v8.NewIsolate()
+	defer isoB.Dispose()
+	var inCleanup bool
+	calls := 0
+	isoA.SetPromiseRejectedCallback(func(v8.PromiseRejectMessage) {
+		isoB.Cleanup()
+	})
+	global := v8.NewObjectTemplate(isoA)
+	if err := global.Set("goFn", v8.NewFunctionTemplate(isoA, func(*v8.FunctionCallbackInfo) *v8.Value {
+		if inCleanup {
+			calls++
+		}
+		return nil
+	})); err != nil {
+		t.Fatal(err)
+	}
+	ctx := v8.NewContext(isoA, global)
+	defer ctx.Close()
+
+	// The rejection's task is posted when the background compilation fails,
+	// before the GC below posts the FinalizationRegistry's: it runs first.
+	if _, err := ctx.RunScript(`WebAssembly.compile(new Uint8Array([1, 2, 3, 4]));
+var r = new FinalizationRegistry(goFn);
+(function () { r.register({}, 1); })();`, "setup.js"); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	isoA.LowMemoryNotification()
+	inCleanup = true
+	isoA.Cleanup()
+	inCleanup = false
+	if calls != 0 {
+		t.Fatalf("Isolate.Cleanup called a Go function %d times", calls)
+	}
+}
+
+// Promises settled by the tasks Cleanup runs (Atomics.waitAsync timeouts,
+// wasm compilations) queue their reactions as microtasks: Cleanup drops them,
+// rather than leaving them to run at the end of the next script.
+func TestIsolateCleanupDropsReactionsOfPumpedTasks(t *testing.T) {
+	t.Parallel()
+	iso := v8.NewIsolate()
+	defer iso.Dispose()
+	var inCleanup bool
+	calls := 0
+	global := v8.NewObjectTemplate(iso)
+	if err := global.Set("goFn", v8.NewFunctionTemplate(iso, func(*v8.FunctionCallbackInfo) *v8.Value {
+		calls++
+		return nil
+	})); err != nil {
+		t.Fatal(err)
+	}
+	ctx := v8.NewContext(iso, global)
+	defer ctx.Close()
+
+	pumpUntilSettled(t, iso, ctx, `var page = 1, log = [];
+var waited = Atomics.waitAsync(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1).value;
+waited.then(() => { log.push("waitAsync during page " + page); });
+waited.then(goFn);
+var rejected = WebAssembly.compile(new Uint8Array([1, 2, 3, 4]));
+rejected.catch(() => { log.push("wasm catch during page " + page); });
+var compiled = WebAssembly.compile(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
+compiled.then(() => { log.push("wasm then during page " + page); });
+compiled.then(goFn);
+[waited, rejected, compiled]`, &inCleanup)
+	ctx.Cleanup()
+
+	if _, err := ctx.RunScript("page = 2; 0", "page2.js"); err != nil {
+		t.Fatal(err)
+	}
+	ctx.PerformMicrotaskCheckpoint()
+	v, err := ctx.RunScript("JSON.stringify(log)", "log.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.String() != "[]" {
+		t.Errorf("reactions ran after Isolate.Cleanup: %s", v)
+	}
+	if calls != 0 {
+		t.Errorf("Go reactions ran %d times after Isolate.Cleanup", calls)
+	}
+}

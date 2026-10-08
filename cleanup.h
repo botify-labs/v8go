@@ -25,6 +25,17 @@ typedef m_ctx* ContextPtr;
 extern void ContextCleanup(ContextPtr ctx);
 extern int IsolateCleanup(IsolatePtr iso);
 extern int IsolateInternalRetainedValueCount(IsolatePtr iso);
+
+// Defined in isolate.cc (tools/patches/0007-heap-limit.patch), next to the
+// heap limit state they read or clear.
+// Whether the heap limit was reached since the isolate was created or since
+// IsolateResetHeapLimitReached; callable without the isolate's lock.
+extern int IsolateHeapLimitRaised(IsolatePtr iso);
+// Whether a heap limit termination is still to be reported (see
+// IsolateTakeHeapLimitReached), without clearing it.
+extern int IsolatePeekHeapLimitReached(IsolatePtr iso);
+// Forgets both: Isolate.Cleanup.
+extern void IsolateResetHeapLimitReached(IsolatePtr iso);
 extern int IsolateInternalUnboundScriptCount(IsolatePtr iso);
 
 #ifdef __cplusplus

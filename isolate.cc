@@ -10,9 +10,12 @@
 #include "deps/include/v8-promise.h"
 
 #include "_cgo_export.h"
+#include "botify_context.h"
 #include "context.h"
 #include "isolate.h"
 #include "libplatform/libplatform.h"
+
+#include <atomic>
 
 using namespace v8;
 
@@ -45,8 +48,13 @@ extern "C" {
 // Per-isolate state, in data slot 1. Slot 0 holds the internal context.
 struct IsolateState {
   // Set when NearMemoryLimitCallback terminates execution, and cleared
-  // when the termination is reported.
+  // when the termination is reported (Botify: at the top level, see
+  // ExceptionError) or by Isolate.Cleanup.
   bool heap_limit_reached = false;
+
+  // Botify: set with heap_limit_reached, but only cleared by Isolate.Cleanup
+  // (Isolate.HeapLimitReached). Read without the isolate's lock.
+  std::atomic<bool> heap_limit_raised{false};
 
   // Whether errors include a serialized exception message.
   bool exception_messages = false;
@@ -76,6 +84,7 @@ size_t NearMemoryLimitCallback(void* data,
   auto iso = static_cast<Isolate*>(data);
   auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
   state->heap_limit_reached = true;
+  state->heap_limit_raised.store(true, std::memory_order_relaxed);
   iso->TerminateExecution();
 
   // if we return the initial heap limit, the VM will crash, so here we give it
@@ -155,6 +164,23 @@ int IsolateTakeHeapLimitReached(IsolatePtr iso) {
   return 1;
 }
 
+// Botify (cleanup.h).
+int IsolatePeekHeapLimitReached(IsolatePtr iso) {
+  auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
+  return state->heap_limit_reached;
+}
+
+int IsolateHeapLimitRaised(IsolatePtr iso) {
+  auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
+  return state->heap_limit_raised.load(std::memory_order_relaxed);
+}
+
+void IsolateResetHeapLimitReached(IsolatePtr iso) {
+  auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
+  state->heap_limit_reached = false;
+  state->heap_limit_raised.store(false, std::memory_order_relaxed);
+}
+
 void IsolateTerminateExecution(IsolatePtr iso) {
   iso->TerminateExecution();
 }
@@ -184,6 +210,11 @@ static_assert(kPromiseHandlerAddedAfterReject == 1);
 
 static void PromiseRejectedCallback(PromiseRejectMessage message) {
   Isolate* iso = Isolate::GetCurrent();
+  // Botify: Isolate.Cleanup runs no page code, Go included (botify_context.h).
+  // The tasks it runs reject promises (e.g. a failed wasm compilation).
+  if (BotifyInCleanup(iso)) {
+    return;
+  }
   Local<Promise> promise = message.GetPromise();
 
   Local<Context> local_ctx;

@@ -52,10 +52,14 @@ inline void BotifyContextForget(m_ctx* ctx) {
 
 // The isolate whose V8 tasks Isolate.Cleanup runs on this thread, if any
 // (cleanup.cc). Cleanup runs no JavaScript: it terminates the JavaScript a
-// task calls (a FinalizationRegistry callback), but V8 calls a function
-// callback, given directly as a FinalizationRegistry's callback, without
-// checking for termination. Function callbacks then return undefined without
-// calling Go.
+// task calls (a FinalizationRegistry callback, a promise reaction), but C++
+// code runs regardless: a function callback or a builtin such as console.log
+// given directly as a FinalizationRegistry's callback or a reaction, or V8
+// rejecting a promise (a failed wasm compilation). The code that would call Go
+// returns without calling it then: function callbacks return undefined
+// (tools/patches/0005-callback-guards.patch), the PromiseRejectedCallback and
+// the inspector's console messages do nothing
+// (tools/patches/0006-cleanup-pump-guards.patch).
 extern constinit thread_local v8::Isolate* botify_cleanup_isolate;
 
 inline bool BotifyInCleanup(v8::Isolate* iso) {

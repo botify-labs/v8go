@@ -11,6 +11,7 @@
 #include "deps/include/v8-message.h"
 #include "deps/include/v8-primitive.h"
 
+#include "cleanup.h"
 #include "errors.h"
 #include "isolate.h"
 #include "utils.h"
@@ -89,12 +90,23 @@ RtnError ExceptionError(TryCatch& try_catch, Isolate* iso, Local<Context> ctx) {
   RtnError rtn = {};
 
   if (try_catch.HasTerminated()) {
-    if (IsolateTakeHeapLimitReached(iso)) {
+    // Botify: V8 clears the termination when it reaches a TryCatch at call
+    // depth zero, i.e. once no JavaScript remains on the stack, and Reset
+    // does now what the TryCatch's destructor would do. Otherwise (a script
+    // run by a Go callback, itself called from JavaScript), the termination
+    // goes on through the outer script, whose error must report the heap
+    // limit too: the flag is only taken at the top level.
+    try_catch.Reset();
+    bool top_level = !iso->IsExecutionTerminating();
+    if (top_level ? IsolateTakeHeapLimitReached(iso)
+                  : IsolatePeekHeapLimitReached(iso)) {
       // The script has unwound, so its garbage can be collected. This
       // makes AutomaticallyRestoreInitialHeapLimit restore the limit,
       // which it only does when the heap is small enough. Otherwise, the
       // next script reaching the limit would raise it further.
-      iso->LowMemoryNotification();
+      if (top_level) {
+        iso->LowMemoryNotification();
+      }
       rtn.msg = CopyString("ExecutionTerminated: heap limit reached");
       rtn.heap_limit_reached = 1;
     } else {

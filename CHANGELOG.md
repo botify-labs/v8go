@@ -34,8 +34,13 @@ First release of the module `github.com/botify-labs/v8go`, replacing the Botify 
 
 #### Added
 - `Isolate.Cleanup` and `Context.Cleanup`, carried over from the old fork. `Isolate.Cleanup` also runs
-  V8's pending GC tasks; it never runs JavaScript or Go callbacks, cancels a termination requested
-  while it runs, and both do nothing when called with JavaScript on the stack.
+  V8's pending tasks (GC, and those that settle promises: wasm compilations, `Atomics.waitAsync`); it
+  never runs JavaScript or Go callbacks (function callbacks, `PromiseRejectedCallback`, inspector
+  console messages), drops the promise reactions still pending, cancels a termination requested
+  while it runs, and clears the heap limit state. Both do nothing when called with JavaScript on the
+  calling thread's stack, and need exclusive use of the isolate.
+- `Isolate.HeapLimitReached`: whether the heap limit was reached since the last `Isolate.Cleanup`,
+  including when no error reported it (in a promise reaction, while compiling, in a GC).
 - `SetDefaultLocale`, to pin the default locale of V8's ICU process-wide.
 
 #### Fixed
@@ -46,7 +51,11 @@ First release of the module `github.com/botify-labs/v8go`, replacing the Botify 
   `malloc`.
 - Calling a function of a closed `Context` throws `Error: v8go: context closed` instead of crashing.
 - A Go callback returning the error of a terminated nested script keeps the termination going,
-  instead of turning it into a catchable exception.
+  instead of turning it into a catchable exception. When a nested script reaches the heap limit, the
+  outer script's error matches `ErrHeapLimitReached` too.
+- A heap limit reached without a reported termination (in a promise reaction run after the script's
+  result, for instance) no longer makes a later `TerminateExecution` report `ErrHeapLimitReached`
+  once `Isolate.Cleanup` has run.
 - JS→Go calls are faster (about −57% on bursts of calls, see `bench/results/2026-10-07-final/`).
 
 ## tommie/v8go history

@@ -40,31 +40,64 @@ static bool InJavaScript(Isolate* iso) {
   return iso->InContext();
 }
 
+// Sets botify_cleanup_isolate for its lifetime, and restores the previous
+// value afterwards, rather than nullptr: a Cleanup of another isolate nested
+// in the pump must not unguard the rest of it.
+class CleanupIsolateScope {
+ public:
+  explicit CleanupIsolateScope(Isolate* iso)
+      : previous_(botify_cleanup_isolate) {
+    botify_cleanup_isolate = iso;
+  }
+  ~CleanupIsolateScope() { botify_cleanup_isolate = previous_; }
+  CleanupIsolateScope(const CleanupIsolateScope&) = delete;
+  CleanupIsolateScope& operator=(const CleanupIsolateScope&) = delete;
+
+ private:
+  Isolate* previous_;
+};
+
 // V8 posts work for an isolate to the platform's foreground task queue: GC
-// tasks (memory reducer, GC jobs, ...) and FinalizationRegistry cleanups.
-// v8go never runs that queue, so the tasks piled up in native memory, and
-// without the memory reducer V8 only ran a major GC at its initial old-space
-// limit. Runs the pending tasks, the expired delayed ones, and the ones they
-// post, without waiting.
+// tasks (memory reducer, GC jobs, ...), FinalizationRegistry cleanups, and the
+// tasks that settle promises (wasm compilations, Atomics.waitAsync timeouts and
+// notifications...). v8go never runs that queue, so the tasks piled up in
+// native memory, and without the memory reducer V8 only ran a major GC at its
+// initial old-space limit. Runs the pending tasks, the expired delayed ones,
+// and the ones they post, without waiting.
 //
-// No JavaScript runs (nor Go: see botify_cleanup_isolate). The page is done
-// when Cleanup is called, and nothing would stop a callback that never
-// returns. A termination is requested before each task, so that the
-// JavaScript a task calls is terminated at its first instruction: the only
-// such tasks are FinalizationRegistry cleanups, and V8 15.4's
+// No JavaScript runs, nor Go: the page is done when Cleanup is called, and
+// nothing would stop a callback that never returns. A termination is
+// requested before each task, so that the JavaScript a task calls is
+// terminated at its first instruction. V8 15.4's FinalizationRegistry cleanup
 // (FinalizationRegistryCleanupTask, JSFinalizationRegistry::Cleanup) pops a
 // cell before it calls the callback, stops at the exception, and posts itself
 // again while cells remain: each run makes progress, so the pump ends. The
 // task's TryCatch, at call depth zero, clears the termination, hence one
 // request per task. GC tasks (memory reducer, GC jobs) run no JavaScript and
-// don't check for termination: they run as before.
+// don't check for termination: they run as before. A C++ builtin called
+// directly (e.g. a FinalizationRegistry whose callback is console.log or a Go
+// function) runs no JavaScript either, so the termination doesn't stop it:
+// v8go's code that calls Go (function callbacks, the PromiseRejectedCallback,
+// the inspector's console messages) returns without calling it while
+// botify_cleanup_isolate is iso.
+//
+// A task that settles a promise queues its reactions as microtasks, which
+// would run at the end of the next script run in the isolate, i.e. in the
+// next page. They are dropped: a microtask checkpoint with the termination
+// requested terminates the first reaction's JavaScript, and V8 then discards
+// the whole queue (MicrotaskQueue::RunMicrotasks). The reactions ahead of it
+// that are C++ builtins or Go functions run, without calling Go. This also
+// drops the reactions queued by Go since the last script (e.g.
+// PromiseResolver.Resolve without PerformMicrotaskCheckpoint).
 //
 // The termination is cancelled afterwards, with any other one requested in
 // the meantime (e.g. by a watchdog firing during the pump): the next script
-// starts with none.
+// starts with none. The heap limit state is cleared too (IsolateState in
+// isolate.cc): a heap limit reached with no termination reported for it (in
+// a reaction after the script's result, in a GC of the pump...) must not make
+// the next page's termination, e.g. a timeout, report ErrHeapLimitReached.
 static void RunPendingTasks(Isolate* iso) {
-  // Function callbacks a task calls don't call Go (botify_context.h).
-  botify_cleanup_isolate = iso;
+  CleanupIsolateScope cleanup_scope(iso);
   for (int i = 0; i < kMaxPendingTasksPerCleanup; i++) {
     // A task consumes the request when it runs JavaScript: renew it.
     iso->TerminateExecution();
@@ -72,8 +105,10 @@ static void RunPendingTasks(Isolate* iso) {
       break;
     }
   }
+  iso->TerminateExecution();
+  iso->PerformMicrotaskCheckpoint();
   iso->CancelTerminateExecution();
-  botify_cleanup_isolate = nullptr;
+  IsolateResetHeapLimitReached(iso);
 }
 
 void ContextCleanup(ContextPtr ctx) {

@@ -5,6 +5,7 @@
 #include "deps/include/v8-inspector.h"
 
 #include "_cgo_export.h"
+#include "botify_context.h"
 #include "context-macros.h"
 #include "inspector.h"
 
@@ -50,6 +51,13 @@ void InspectorClient::consoleAPIMessage(int contextGroupId,
                                         unsigned lineNumber,
                                         unsigned columnNumber,
                                         V8StackTrace*) {
+  // Botify: Isolate.Cleanup runs no page code, Go included (botify_context.h).
+  // A C++ builtin such as console.log, called directly by a task it runs
+  // (e.g. as a FinalizationRegistry callback), isn't stopped by the
+  // termination it requests.
+  if (BotifyInCleanup(Isolate::GetCurrent())) {
+    return;
+  }
   goHandleConsoleAPIMessageCallback(
       _cgoHandle, contextGroupId, level, ConvertStringView(message),
       ConvertStringView(url), lineNumber, columnNumber);

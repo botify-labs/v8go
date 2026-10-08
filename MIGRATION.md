@@ -107,17 +107,33 @@ compilation, §4). Les comportements qui changent sont au §3bis.
 ## 3bis. Comportements modifiés
 
 - **`Isolate.Cleanup()` exécute les tâches que V8 a postées pour l'isolate** (GC : memory reducer,
-  etc.), que v8go n'exécute nulle part ailleurs. Sans cela, un isolate long-lived accumulait ces
-  tâches en mémoire native et ne lançait un GC majeur qu'à sa limite initiale. L'appeler
-  régulièrement sur un isolate long-lived. Pendant `Cleanup()` :
+  etc. ; tâches qui règlent des promesses : compilation wasm asynchrone, `Atomics.waitAsync`), que
+  v8go n'exécute nulle part ailleurs. Sans cela, un isolate long-lived accumulait ces tâches en
+  mémoire native et ne lançait un GC majeur qu'à sa limite initiale. L'appeler régulièrement sur un
+  isolate long-lived. Pendant `Cleanup()` :
   - aucun JS ni callback Go ne s'exécute : le JS qu'une tâche lancerait (callbacks
-    `FinalizationRegistry`) est interrompu avant sa première instruction, et un callback de fonction
-    renvoie `undefined` sans appeler Go ;
-  - un `TerminateExecution` demandé pendant `Cleanup()` (watchdog sur une autre goroutine) est
-    annulé : le script suivant s'exécute normalement.
-- **Les deux `Cleanup()` ne font rien s'ils sont appelés avec du JS sur la pile** (depuis un
-  `FunctionCallback`, ou pendant qu'un script s'exécute sur l'isolate) : ils libéreraient les valeurs
-  des appels en cours. Les appeler une fois le script terminé.
+    `FinalizationRegistry`, réactions de promesses) est interrompu avant sa première instruction ; un
+    callback de fonction renvoie `undefined` sans appeler Go, et ni le `PromiseRejectedCallback` ni
+    le handler des messages console d'un `Inspector` ne sont appelés ;
+  - les réactions de promesses encore en attente (celles des promesses réglées par ces tâches, ou
+    mises en file par Go depuis le dernier script, par exemple `PromiseResolver.Resolve` sans
+    `PerformMicrotaskCheckpoint`) sont abandonnées, au lieu de s'exécuter à la fin du script
+    suivant, c'est-à-dire dans la page suivante ;
+  - un `TerminateExecution` demandé pendant `Cleanup()` est annulé : le script suivant s'exécute
+    normalement. Y compris celui qu'un watchdog, sur une autre goroutine, demande pour un script qui
+    attend le verrou de l'isolate pendant que `Cleanup()` le tient : ce script s'exécute alors
+    jusqu'au bout. Avec un tel watchdog, ne pas appeler `Cleanup()` en concurrence avec les
+    scripts : l'appeler sur la goroutine qui les exécute, entre deux scripts.
+- **`Isolate.Cleanup()` demande l'usage exclusif de l'isolate** : il remplace `Undefined(iso)` et
+  `Null(iso)` sans synchronisation et libère les valeurs de l'isolate. Une autre goroutine qui
+  garderait l'ancien `Undefined`/`Null` (ou une autre valeur libérée) utiliserait une valeur
+  libérée. Ne pas exécuter de script ni utiliser de valeur de l'isolate sur d'autres goroutines
+  pendant l'appel.
+- **Les deux `Cleanup()` ne font rien s'ils sont appelés avec du JS de l'isolate sur la pile du
+  thread appelant** (depuis un `FunctionCallback`) : ils libéreraient les valeurs des appels en
+  cours. Appelés depuis une autre goroutine pendant qu'un script s'exécute, ils attendent le verrou
+  (`Locker`) de l'isolate, donc la fin du script, puis s'exécutent : un callback Go qui attend une
+  goroutine appelant `Cleanup()` provoque un interblocage. Les appeler une fois le script terminé.
 - `Undefined(iso)` et `Null(iso)` obtenues avant `Isolate.Cleanup()` ne doivent plus être utilisées
   après : `Cleanup` libère les valeurs de l'isolate et les recrée, les re-récupérer.
 - **Fonction d'un `Context` fermé** : une fonction Go d'un contexte fermé (`Close`), encore
@@ -130,8 +146,14 @@ compilation, §4). Les comportements qui changent sont au §3bis.
 - **Limite de heap** : elle n'arrête plus le processus (§4). Quand la limite approche, le callback de
   v8go relève la limite pour que V8 puisse interrompre le script proprement ; le script reçoit une
   erreur `ExecutionTerminated: heap limit reached` (`errors.Is(err, v8go.ErrHeapLimitReached)`), et la
-  limite initiale est restaurée. L'isolate reste utilisable, mais l'état JS laissé par le script
-  interrompu est indéterminé : recycler l'isolate (le disposer et en créer un autre) est recommandé.
+  limite initiale est restaurée. Si c'est un script imbriqué (lancé par un callback Go) qui atteint
+  la limite, son erreur et celle du script de plus haut niveau la reconnaissent toutes deux.
+  L'isolate reste utilisable, mais l'état JS laissé par le script interrompu est indéterminé :
+  recycler l'isolate (le disposer et en créer un autre) est recommandé. La limite peut aussi être
+  atteinte sans qu'aucune erreur ne le signale (dans une réaction de promesse exécutée après le
+  résultat du script, pendant une compilation, pendant un GC) : `iso.HeapLimitReached()` indique si
+  elle l'a été depuis le dernier `Isolate.Cleanup()` (qui la remet à zéro), par exemple pour décider
+  du recyclage avant `Cleanup()`.
 - **Intl/ICU activé.** L'ancien fork était compilé sans i18n ; V8 embarque désormais son ICU (ICU 78,
   symboles suffixés `_78`, qui cohabitent avec une autre ICU liée par le consommateur). `Intl`,
   `toLocaleString`, `localeCompare`, `toLocaleDateString`, le nom du fuseau dans
@@ -176,4 +198,4 @@ Ajouts sans impact sur les consommateurs existants (listés par `apidiff`) : `Is
 `Object` et `ObjectTemplate` (`SetSymbol`, `GetSymbol`, `HasSymbol`, `DeleteSymbol`), `Value.AsSymbol`,
 `Value.AsException`, `Value.External`, `Value.StrictEquals`, `Value.TypeOf`, `NewError` et variantes,
 `Inspector`, `Promise.ThenWithError` / `CatchWithError`, `JSError.ExceptionMessage` / `Unwrap`,
-`FunctionTemplate.Inherit` / `InstanceTemplate` / `PrototypeTemplate`, etc. Ajout propre à Botify : `SetDefaultLocale` (§3bis).
+`FunctionTemplate.Inherit` / `InstanceTemplate` / `PrototypeTemplate`, etc. Ajouts propres à Botify : `SetDefaultLocale` et `Isolate.HeapLimitReached` (§3bis).
