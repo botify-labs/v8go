@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Fails if a prebuilt bridge doesn't match the current sources.
-# Usage: tools/check_bridge.sh [os_arch ...]   (default: all deps/*_*)
+# Fails if a prebuilt bridge is missing or doesn't match the current sources,
+# or if a directory named on the command line is no deps module.
+# Usage: tools/check_bridge.sh [os_arch ...]   (default: every deps/*_*/go.mod)
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
@@ -15,10 +16,26 @@ fi
 
 want=$(tools/bridge_hash.sh)
 targets=("$@")
-[ ${#targets[@]} -gt 0 ] || targets=($(cd deps && ls -d *_*/ | tr -d /))
+named=${#targets[@]}
+# By default, the deps/<os>_<arch> modules: deps/include_libcxx and the like
+# are no module.
+[ "$named" -gt 0 ] || targets=($(cd deps && ls -d *_*/ | tr -d /))
 stale=0
 for t in "${targets[@]}"; do
-  [ -f "deps/$t/go.mod" ] || continue
+  if [ ! -f "deps/$t/go.mod" ]; then
+    if [ "$named" -gt 0 ]; then
+      echo "deps/$t is no deps module (no go.mod)"
+      stale=1
+    fi
+    continue
+  fi
+  archive=libv8go.a
+  [[ "$t" != windows_* ]] || archive=v8go.lib
+  if [ ! -f "deps/$t/$archive" ]; then
+    echo "missing bridge: deps/$t/$archive"
+    stale=1
+    continue
+  fi
   got=$(cat "deps/$t/bridge.sha256" 2>/dev/null || echo missing)
   if [ "$got" != "$want" ]; then
     echo "stale bridge: deps/$t ($got, want $want)"

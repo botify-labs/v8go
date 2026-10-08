@@ -14,3 +14,6 @@ c.out
 go.work
 .idea/*
 /v8go.test
+
+# Botify (tools/botify-owned.txt: this file is no longer synced from tommie)
+/.superpowers/

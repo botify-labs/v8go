@@ -20,6 +20,8 @@
 /cleanup_test.go
 /botify_*
 /MIGRATION.md
+/README.md
+/.gitignore
 /BOTIFY.md
 /CGO-DEPENDENCIES.md
 /deps/tommie_sha

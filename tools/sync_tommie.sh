@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Imports a tommie/v8go snapshot into this repository, renamed to
 # github.com/botify-labs/v8go. Files matching tools/botify-owned.txt are kept.
-# Android and tommie's V8 build/upgrade workflows are not imported.
+# Android and tommie's workflows are not imported: botify-ci replaces its CI
+# workflows, which ran unpinned third-party code with secrets.
 # The C++ sources are restricted to -tags v8go_source: consumers link the
 # prebuilt bridge (tools/build_bridge.sh) instead of compiling them.
 #
@@ -24,8 +25,10 @@ rm -rf "$SRC/.git"
 rsync -a --delete --exclude-from="$ROOT/tools/botify-owned.txt" "$SRC/" "$ROOT/"
 
 cd "$ROOT"
-rm -rf .gitmodules deps/v8 deps/depot_tools \
-  .github/workflows/v8upgrade.yml .github/workflows/v8build.yml .github/workflows/release.yml
+rm -rf .gitmodules deps/v8 deps/depot_tools .fossa.yml
+# All of tommie's workflows (test, fmt, leakcheck, vendor, v8build, v8upgrade,
+# release...): only botify-*.yml run here.
+find .github/workflows -maxdepth 1 -type f ! -name 'botify-*' -exec rm -f {} +
 git rm -q -r --cached --ignore-unmatch deps/v8 deps/depot_tools >/dev/null
 
 grep -rlZ -e 'github.com/tommie/v8go' \
@@ -116,7 +119,12 @@ tools/check_no_allocator_shim.sh
 tools/gen_cxx_runtime_rename_map.sh
 tools/rename_cxx_runtime.sh
 
-[ -z "$EXEC" ] || { echo "$EXEC" | xargs git add -- && echo "$EXEC" | xargs git update-index --chmod=+x --; }
+# tommie's executables, minus those removed above (.fossa.yml...).
+EXEC=$(echo "$EXEC" | while IFS= read -r f; do [ ! -f "$f" ] || echo "$f"; done)
+if [ -n "$EXEC" ]; then
+  echo "$EXEC" | xargs git add --
+  echo "$EXEC" | xargs git update-index --chmod=+x --
+fi
 
 echo "$SHA" >deps/tommie_sha
 tools/check_cxx_runtime_isolated.sh

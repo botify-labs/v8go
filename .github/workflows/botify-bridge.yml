@@ -28,6 +28,14 @@ on:
     - tools/rename_cxx_runtime.sh
     - tools/build_bridge.sh
     - tools/bridge_hash.sh
+    - .github/actions/setup-clang/action.yml
+
+# One run at a time per branch, in push order: a run commits the bridges of
+# its own commit, and a later push's run waits for it (then rebuilds if they
+# are stale for its sources) instead of racing it.
+concurrency:
+  group: botify-bridge-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -102,7 +110,10 @@ jobs:
           cp "$d"/* "deps/${d#artifacts/bridge-}/"
         done
         tools/check_bridge.sh
-    - uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
+    # Never on master (protected; also by hand: workflow_dispatch accepts it):
+    # go through a PR branch.
+    - if: github.ref != 'refs/heads/master'
+      uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
       with:
         commit_message: Rebuild prebuilt v8go bridges
         file_pattern: deps/*/libv8go.a deps/*/v8go.lib deps/*/bridge.sha256

@@ -42,6 +42,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v7
+      with:
+        # The pinned commits: their deps/<os>_<arch> trees are compared with
+        # HEAD's. Trees only: no blobs of the history (V8 archives).
+        fetch-depth: 0
+        filter: blob:none
     - uses: actions/setup-go@v7
       with:
         go-version: '1.27'
