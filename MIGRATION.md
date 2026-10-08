@@ -47,7 +47,12 @@ Pour gojs, c'est le seul changement : l'import. Le reste du code n'a pas bougé.
     MinGW doivent être recompilées en MSVC `/MT` (voir `docs/superpowers/cgo-inventory.md`) :
     - liburlnorm : `lib/windows_msvc`, fourni à partir de la version publiée avec cette migration ;
     - igzip (cdf et pulse) : `igzip.lib` à côté de `libigzip.a` ;
-    - zstd de gocdf : `zstd_windows.lib` à côté de `libzstd_windows.a` (via une PR sur gocdf).
+    - zstd de gocdf : `zstd_windows.lib` à côté de `libzstd_windows.a` (botify-hq/gocdf#926, à
+      publier en v3.19.12). **pulse** requiert gocdf v3.16.16, qui n'a que la lib MinGW : ses builds
+      Windows natifs (local tester…) ne lient plus tant que gocdf#926 n'est pas fusionnée et taguée,
+      puis `gocdf/v3` montée dans pulse. Linux n'est pas concerné. De même pour ftl s'il est un
+      jour construit sous Windows (gocdf v3.19.11, et cdf `go/pkg` sans `igzip.lib` avant son
+      prochain tag).
   - Avec clang ciblant MSVC, `-lfoo` résout `foo.lib` : les `.lib` MSVC peuvent coexister avec les
     `.a` MinGW sans changer les LDFLAGS.
 - **Autres dépendances cgo** (pourquoi liburlnorm, zstd et igzip ont dû être recompilées, et comment
