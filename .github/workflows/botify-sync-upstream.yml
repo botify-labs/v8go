@@ -52,5 +52,6 @@ jobs:
         body: |
           Automated import by tools/sync_tommie.sh.
           1. Run the "Botify Bridge" workflow on this branch (the prebuilt bridges are stale until then).
-          2. Botify CI must pass: consumer and source tests on 5 targets, LeakSanitizer, Cleanup soak.
-          3. After merge: tools/pin_deps.sh <merge sha>.
+          2. Before merging, on this branch: tools/pin_deps.sh <sha of the bridge commit>, then commit go.mod, go.sum and bench/go.mod (BOTIFY.md).
+          3. Botify CI must pass, pinned-deps-fresh included: consumer and source tests on 5 targets, LeakSanitizer, Cleanup soak.
+          4. Merge with a merge commit (no squash or rebase: go.mod references this branch's commits).

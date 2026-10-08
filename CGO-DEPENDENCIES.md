@@ -8,7 +8,8 @@ fork). L'inventaire détaillé de ftl et pulse est dans `docs/superpowers/cgo-in
 En résumé :
 
 - **Linux / macOS, lien dynamique (le cas normal) : rien à faire.** Les libs C, C++ (g++/libstdc++),
-  précompilées ou compilées depuis leurs sources cohabitent avec V8.
+  précompilées ou compilées depuis leurs sources cohabitent avec V8. Validé sous Linux ; sous macOS,
+  le C++ tiers n'est pas testé (§2.4).
 - **Linux, lien totalement statique (`-extldflags '-static'`) : rien à faire non plus.** Le runtime
   C++ de V8 est renommé dans ses archives Linux : les libs C++ g++/libstdc++ n'entrent plus en conflit
   avec lui (§2.2). Le prélink de liburlnorm a été retiré de cdf.
@@ -76,7 +77,8 @@ liburlnorm + V8 en `-static`) :
 ```
 
 **Isolation du runtime C++ de V8** (modules `deps/linux_*` à partir de
-`v0.0.0-20261007203548-1be5d95a805e`, que le `go.mod` de v8go épingle) : dans les archives Linux (`libv8-*.a`, `libc++-cr.a`,
+`v0.0.0-20261007203548-1be5d95a805e` ; le `go.mod` de v8go épingle `v0.0.0-20261007211632-a0cb852caccf`,
+puis `v0.10.0` à la publication) : dans les archives Linux (`libv8-*.a`, `libc++-cr.a`,
 `libc++abi-cr.a`, le bridge `libv8go.a`), tous ces symboles sont **renommés**, définitions et
 références, avec le suffixe `.v8cr` (`objcopy --redefine-syms`) :
 
@@ -142,7 +144,13 @@ Un lien entièrement statique n'est pas concerné.
 | C++ compilé depuis les sources avec g++ | OK | OK (runtime C++ de V8 renommé, §2.2) |
 | C++ précompilé avec g++/libstdc++ | OK | OK (pas de prélink : celui de liburlnorm a été retiré) |
 
-macOS n'a pas de lien totalement statique : la ligne de droite ne s'y applique pas.
+macOS n'a pas de lien totalement statique : la colonne de droite ne s'y applique pas.
+
+macOS : le renommage du runtime C++ ne concerne que les archives Linux. Sous macOS, la
+`libc++abi-cr.a` de V8, non renommée, définit `__cxa_*` et `operator new` dans l'exécutable, et le C++
+du consommateur (liburlnorm darwin, compilée contre la libc++ d'Apple) se lie à ces définitions. C'est
+probablement sans effet (liburlnorm n'utilise pas d'exceptions, et les deux runtimes finissent dans
+`malloc`), mais ce n'est pas testé : la ligne « C++ » de ce tableau est validée sous Linux seulement.
 
 ## 3. Windows (natif)
 

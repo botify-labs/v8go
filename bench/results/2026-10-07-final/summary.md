@@ -1,4 +1,6 @@
-# V8 9.0 (6f9829d) → V8 15.4 (b8ae8c5, version finale) — résultats du 2026-10-07
+# V8 9.0 (6f9829d) → V8 15.4 (b8ae8c5) — résultats du 2026-10-07
+
+b8ae8c5 précède l'isolation du runtime C++ de V8 (version publiée : e63bbc8). L'isolation a été mesurée à part, à −0,05 % de geomean v8go (`../2026-10-07-cxx-isolation/`) : les chiffres ci-dessous valent pour la version publiée.
 
 Machine : Intel Core Ultra 9 285H, 16 CPU, Docker linux/amd64 (WSL2), Go 1.27.1, gcc 12.2. La nouvelle version est compilée comme chez un consommateur (gcc + bridge précompilé, sans allocator shim, avec les optimisations du chemin JS→Go). La version gojs est cdf 9cfc650, comparée à cdf master 97ab17b. COUNT=10.
 
@@ -33,16 +35,18 @@ Machine : Intel Core Ultra 9 285H, 16 CPU, Docker linux/amd64 (WSL2), Go 1.27.1,
 
 Toutes les lignes sont significatives (p < 0.05, n=10).
 
-## gojs (`gojs-benchstat.txt`)
+## gojs
 
-| Benchmark | Écart |
+**Chiffre à retenir : environ −6 % de geomean** (−5,90 %), mesuré en alternant baseline et nouvelle version à chaque tour (10 tours) avec les optimisations JS→Go (`../2026-10-07-callback/callback-perf.md`, section gojs ; le passage alterné précédent, sans ces optimisations, donnait −5,8 %, `../2026-10-06-noshim/`). Contre la baseline : `V8_Cleanup/*` −3 à −12 % (WriteAttributes non significatif), `V8_ColdStart/*` −4 à −9 %, `V8_CleanupOnly` +11 % (1,65 → 1,83 µs).
+
+Le passage `bench/run.sh` de ce jour (`gojs-benchstat.txt`), **non alterné**, donne −19,5 % de geomean, mais sa baseline varie jusqu'à ±109 % selon les lignes : c'est une borne haute bruitée, à ne pas citer comme résultat.
+
+| Benchmark (`gojs-benchstat.txt`, non alterné) | Écart |
 |---|---|
-| V8_Cleanup/* (une page, moteur réutilisé) | **−7 % à −30 %** |
-| V8_ColdStart/* (création du moteur + une page) | **−10 % à −46 %** (WriteAttributes non significatif) |
+| V8_Cleanup/* (une page, moteur réutilisé) | −7 % à −30 % |
+| V8_ColdStart/* (création du moteur + une page) | −10 % à −46 % (WriteAttributes non significatif ; baseline bruitée) |
 | V8_CleanupOnly (Cleanup seul entre deux pages) | +19,6 % (1,85 → 2,21 µs) |
-| **geomean** | **−19,5 %** |
-
-La baseline de ce passage est plus bruitée (jusqu'à ±109 % sur certaines lignes). Le précédent passage propre donnait −5,8 % de geomean avant les optimisations JS→Go. Il faut retenir la tendance (nettement plus rapide) plutôt que la valeur exacte.
+| geomean | −19,5 % (borne haute bruitée ; alterné : −5,9 %) |
 
 ## Endurance (100 000 itérations)
 
@@ -55,6 +59,6 @@ La baseline de ce passage est plus bruitée (jusqu'à ±109 % sur certaines lign
 ## Lecture
 
 - **Chemin JS→Go** (dispatchers gojs) : −57 % sur des appels en rafale, −12,5 % au rythme gojs. La régression initiale de +21 % est résorbée.
-- **Cleanup** : reste +39 % en microbenchmark (+0,37 µs par page dans gojs). C'est le prix du correctif de fuite (vidange des tâches V8) et de la libération des handles globaux de V8 15, payé une fois par page.
-- **JSObjects** : bimodal dans la nouvelle version (±59 %). Certains échantillons subissent un GC majeur de V8 15 pendant la mesure (10 000 objets créés par opération, valeurs retenues jusqu'au Cleanup). Le phénomène est déjà observé dans les campagnes précédentes (+10,7 % ± 202 %). Les pages gojs réelles n'en montrent pas trace.
+- **Cleanup** : reste +39 % en microbenchmark (`Cleanup1000Values`, +0,37 µs par page dans gojs). Le benchmark n'appelle que `ctx.Cleanup()`, qui ne vide pas la file des tâches V8 : l'écart vient de la libération des handles `Global` par V8 15 (`GlobalHandles::Destroy`, `../2026-10-07-callback/callback-perf.md`), payée une fois par page.
+- **JSObjects** : bimodal dans la nouvelle version (±59 %). Hypothèse, non vérifiée : certains échantillons subissent un GC majeur de V8 15 pendant la mesure (10 000 objets créés par opération, valeurs retenues jusqu'au Cleanup). Le phénomène est déjà observé dans les campagnes précédentes (+10,7 % ± 202 %). Les pages gojs réelles n'en montrent pas trace.
 - **Mémoire** : environ +14 MiB par worker gojs et environ +32 MiB de plateau par isolate de longue durée. C'est le coût fixe de V8 15, sans fuite.

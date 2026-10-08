@@ -77,13 +77,14 @@ slower (+17.7% / +15.9%, p=0.000, seen in 2 runs).
   no regression) was removed from cdf (ebbccce): v8go now isolates its own
   C++ runtime, so the original libraries link statically with V8.
 
-The full report, with every benchstat table, the flags of each build and the
-run links, is in `.superpowers/sdd/2026-10-06-v8-upgrade/cgo-libs-perf-report.md`
-(local). Bench workflows:
+Every benchstat table is in the logs and artifacts of the runs below. The
+bench workflows were temporary and were deleted before the merge; they are in
+the history of the PR branches (the benchmarks themselves, `bench_test.go`,
+stay next to each package):
 
-- cdf: `.github/workflows/windows-cgo-bench.yml`
-- pulse: `.github/workflows/igzip-windows-bench.yml`
-- gocdf: `.github/workflows/zstd-windows-bench.yml`
+- cdf (`upgrade-v8go` @ 4eb4db7): `.github/workflows/windows-cgo-bench.yml`
+- pulse (`upgrade-v8go` @ afc08fc2): `.github/workflows/igzip-windows-bench.yml`
+- gocdf (`msvc-static-libs` @ 1834e050): `.github/workflows/zstd-windows-bench.yml`
 
 Runs:
 

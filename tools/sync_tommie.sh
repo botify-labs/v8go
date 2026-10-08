@@ -44,7 +44,8 @@ go mod edit \
 HDR=$'// clang-format off\n//go:build v8go_source\n// clang-format on'
 for src in *.cc; do
   [ "$(sed -n 1,3p "$src")" = "$HDR" ] && continue
-  sed -i '1{/^\/\/ \?go:build v8go_source$/{N;/\n$/d}}' "$src"
+  # Drop a bare tag on line 1, and line 2 too when it is blank.
+  sed -i '1{/^\/\/ \?go:build v8go_source$/{N;s/^[^\n]*\n//;/^$/d}}' "$src"
   sed -i '1i // clang-format off\n//go:build v8go_source\n// clang-format on\n' "$src"
 done
 for f in deps/*_*/cgo.go; do
@@ -60,6 +61,16 @@ for f in deps/*_*/cgo.go; do
   # the archives, so that its EXTERNs load their members.
   grep -q -- '-lv8go_cxxalias' "$f" ||
     sed -i '/^\/\/ #cgo LDFLAGS: -L\${SRCDIR}$/a // #cgo linux,v8go_source LDFLAGS: -lv8go_cxxalias' "$f"
+done
+# The seds above match tommie's cgo.go lines: stop if one of them changed shape.
+for f in deps/*_*/cgo.go; do
+  for line in '// #cgo !v8go_source LDFLAGS: -lv8go' '// #cgo linux,!v8go_source LDFLAGS: -lm' \
+    '// #cgo linux,v8go_source LDFLAGS: -lv8go_cxxalias'; do
+    if ! grep -qxF -- "$line" "$f"; then
+      echo "$f: missing '$line' (tommie's cgo.go changed shape): update tools/sync_tommie.sh" >&2
+      exit 1
+    fi
+  done
 done
 
 # Botify's changes to tommie's files, in order: each patch applies to the

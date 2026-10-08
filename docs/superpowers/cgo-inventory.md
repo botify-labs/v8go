@@ -3,8 +3,9 @@
 Purpose: on Windows everything will be linked statically with the MSVC-target clang toolchain, so every
 cgo package that links a PREBUILT MinGW library (`-L... -l...` in `#cgo windows LDFLAGS`) has to be
 rebuilt for MSVC. Packages compiled from source need nothing. On Linux, any prebuilt static C++ library
-built against g++/libstdc++ hits the same fully-static-link clash with V8's libc++abi that was fixed for
-liburlnorm by prelinking.
+built against g++/libstdc++ hit a fully-static-link clash with V8's libc++abi. That clash is now gone
+for every library: v8go renames V8's C++ runtime in its Linux archives (the liburlnorm prelink that
+worked around it first was removed from cdf).
 
 Inventory taken on 2026-10-06 from worktrees of the remote default branches (`ftl` = origin/master
 @ 2cfc409f0, `pulse` = origin/main @ de3ffe99), in the dev container, with
@@ -135,8 +136,8 @@ so it is not compiled. The live jq implementation is `jq/wasm` (no cgo linkage).
 ## Prebuilt C++ libraries on Linux (libstdc++ clash risk)
 
 - `liburlnorm` (+ `libicui18n/io/tu/uc/data.a`, `-ldl`): the only prebuilt C++ static library on Linux. 358
-  libstdc++ symbol references in `liburlnorm.a`, 75/47/38/6 in the ICU archives. Already isolated by the
-  prelink work (Tasks 21-22).
+  libstdc++ symbol references in `liburlnorm.a`, 75/47/38/6 in the ICU archives. No action
+  needed since v8go renames V8's C++ runtime (the prelink of Tasks 21-22 was removed).
 - `rogchap.com/v8go` `libv8` (old fork): C++, replaced by this upgrade.
 - Everything else prebuilt on Linux is plain C with zero libstdc++ references (checked with `nm`): 
   `libzstd_linux.a` (gocdf, `-lzstd_linux`), `libigzip.a` (cdf and pulse). No action needed.

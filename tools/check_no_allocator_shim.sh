@@ -39,8 +39,10 @@ for t in "${targets[@]}"; do
     bad=1
     continue
   fi
+  n=0
   for lib in "deps/$t"/libv8-*.a "deps/$t"/v8-*.lib; do
     [ -f "$lib" ] || continue
+    n=$((n + 1))
     if ! members=$("$AR" t "$lib"); then
       echo "$lib: $AR cannot read it" >&2
       bad=1
@@ -64,5 +66,9 @@ for t in "${targets[@]}"; do
       bad=1
     fi
   done
+  if [ "$n" -eq 0 ]; then
+    echo "deps/$t: no V8 archive (libv8-*.a or v8-*.lib) to check" >&2
+    bad=1
+  fi
 done
 exit $bad

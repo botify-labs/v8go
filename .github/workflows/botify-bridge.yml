@@ -3,17 +3,21 @@ name: Botify Bridge
 # Rebuilds the prebuilt C++ bridge for every platform and commits it to the
 # branch the workflow runs on. Run it after a tommie sync or a C++ change.
 on:
+  # By hand: always rebuilds.
   workflow_dispatch:
-  # GitHub only dispatches workflows that exist on the default branch, or that
-  # have already run once. Until upgrade-v8 is merged, a change to this file
-  # on that branch runs it (the bot commit doesn't trigger workflows).
-  # A push that changes the C++ sources, Botify's patches to tommie's files,
-  # the V8 version or the C++ runtime rename of the Linux bridges
-  # (tools/cxx-runtime-rename.map) rebuilds the bridges too. The fingerprint also
-  # covers the Go files with //export (tools/bridge_hash.sh): after a change to
-  # one of those alone, botify-ci's check_bridge fails; run this one by hand.
+  # A push to any branch but master that changes the C++ sources, Botify's
+  # patches to tommie's files, the V8 version, the C++ runtime rename of the
+  # Linux bridges (tools/cxx-runtime-rename.map) or the scripts that shape the
+  # bridge rebuilds the bridges, but only when they are stale
+  # (tools/check_bridge.sh): a push that leaves the fingerprint unchanged, such
+  # as an edit of this file, commits nothing. The bot commits on the pushed
+  # branch (its commit doesn't trigger workflows), so the bridges are rebuilt on
+  # the PR branch (upgrade-v8 until it is merged) and never pushed to master,
+  # which stays protected. The fingerprint also covers the Go files with
+  # //export (tools/bridge_hash.sh): after a change to one of those alone,
+  # botify-ci's check_bridge fails; run this one by hand.
   push:
-    branches: [upgrade-v8]
+    branches-ignore: [master]
     paths:
     - .github/workflows/botify-bridge.yml
     - '*.cc'
@@ -29,7 +33,27 @@ permissions:
   contents: read
 
 jobs:
+  stale:
+    name: Bridges stale?
+    runs-on: ubuntu-24.04
+    outputs:
+      rebuild: ${{ steps.check.outputs.rebuild }}
+    steps:
+    - uses: actions/checkout@v7
+    - id: check
+      env:
+        EVENT: ${{ github.event_name }}
+      run: |
+        if [ "$EVENT" = workflow_dispatch ] || ! tools/check_bridge.sh; then
+          echo rebuild=true >>"$GITHUB_OUTPUT"
+        else
+          echo "bridges match the sources: nothing to rebuild"
+          echo rebuild=false >>"$GITHUB_OUTPUT"
+        fi
+
   build:
+    needs: stale
+    if: needs.stale.outputs.rebuild == 'true'
     name: Bridge ${{ matrix.os }}_${{ matrix.arch }}
     strategy:
       fail-fast: true

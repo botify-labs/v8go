@@ -34,8 +34,9 @@ Pour gojs, c'est le seul changement : l'import. Le reste du code n'a pas bougé.
   de V8 (libc++ et libc++abi de Chromium) est renommé dans les archives Linux (suffixe `.v8cr`) : il
   ne définit plus aucun des symboles de libstdc++/libsupc++ (`__cxa_*`, `std::exception`,
   `operator new`…), chaque runtime garde ses exceptions et son RTTI, sans coût à l'exécution. Le
-  prélink de liburlnorm (`lib/linux/liburlnorm_prelinked.a`, cdf) n'est donc plus nécessaire ; il
-  reste sans danger. Une nouvelle lib C++ n'a rien à faire. Voir `CGO-DEPENDENCIES.md` §2.2.
+  prélink de liburlnorm (`lib/linux/liburlnorm_prelinked.a`), devenu inutile, a donc été retiré de
+  cdf : la liburlnorm d'origine se lie statiquement avec V8. Une nouvelle lib C++ n'a rien à faire.
+  Voir `CGO-DEPENDENCIES.md` §2.2.
 - **Linux, lien dynamique avec du C++ g++** : le même renommage corrige un défaut des versions
   précédentes de cette branche : le runtime de V8, lié dans l'exécutable, supplantait celui de
   `libstdc++.so`, et une exception levée dans libstdc++ (`std::stoi`…) finissait en `std::terminate`.

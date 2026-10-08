@@ -61,7 +61,8 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   `botify_context.h` (le `m_ctx` d'un contexte rangé dans ses *embedder data* : un callback ne
   rappelle plus Go pour le trouver), un callback C++ sans `Locker`/`Isolate::Scope` ni `Global`
   temporaire, et côté Go une seule allocation par appel jusqu'à 4 arguments. Le bridge en dépend :
-  un push sur upgrade-v8 qui touche `*.cc`, `*.h`, `tools/patches/`, `deps/v8_hash` ou la table de
+  un push sur une branche autre que master (upgrade-v8 jusqu'à sa fusion, puis la branche de la PR)
+  qui touche `*.cc`, `*.h`, `tools/patches/`, `deps/v8_hash` ou la table de
   renommage du runtime C++ relance
   `botify-bridge` (pas un `.go` à `//export` seul : `check_bridge` le signale, lancer le workflow à la main).
   Les modifications des fichiers de tommie sont des patchs,
@@ -85,9 +86,10 @@ Après toute modification de ce qu'empreinte `tools/bridge_hash.sh` (C++, patchs
 table de renommage du runtime C++, scripts `build_bridge.sh` et `rename_cxx_runtime.sh`) :
 1. pousser. `botify-bridge` reconstruit les bridges (seul pour `*.cc`, `*.h`, `tools/patches/`,
    `tools/cxx-runtime-rename.map`, ses scripts et
-   `deps/v8_hash` sur upgrade-v8, sinon le lancer à la main) et pousse un commit
-   « Rebuild prebuilt v8go bridges ». D'ici là, `bridge-fresh` et `pinned-deps-fresh` échouent :
-   c'est voulu ;
+   `deps/v8_hash` sur une branche autre que master, sinon le lancer à la main) et, si les bridges
+   ne correspondent plus aux sources, pousse sur cette branche un commit
+   « Rebuild prebuilt v8go bridges » (jamais sur master, protégée : passer par une PR). D'ici là,
+   `bridge-fresh` et `pinned-deps-fresh` échouent : c'est voulu ;
 2. `git pull`, puis `tools/docker/dev.sh 'tools/pin_deps.sh <sha du commit de bridges>'` ; committer
    `go.mod`, `go.sum` et `bench/go.mod`, et pousser ;
 3. ce push relance `botify-ci` (le commit du bot n'en déclenche pas) : le commit de pin ne change pas
