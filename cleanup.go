@@ -7,6 +7,11 @@ import "C"
 // It avoids leaking memory when the Context is long-lived and the scripts it
 // runs are stateless. Any *Value, *Object or *UnboundScript obtained from this
 // Context before the call must not be used afterwards.
+//
+// Cleanup does nothing when called while JavaScript runs on the Isolate, e.g.
+// from a FunctionCallback: it would release the values of the calls in
+// progress (their receiver, arguments and results). Call it once the script
+// has returned.
 func (c *Context) Cleanup() {
 	if c.ptr == nil {
 		return
@@ -18,25 +23,26 @@ func (c *Context) Cleanup() {
 // internal context, i.e. those created by NewValue, function callbacks and
 // CompileUnboundScript. Go values still referenced from JavaScript are kept
 // until V8 collects them. Any such *Value or *UnboundScript obtained before
-// the call must not be used afterwards.
+// the call must not be used afterwards; Undefined and Null must be fetched
+// again rather than reused from before the call.
 //
 // Cleanup first runs the tasks V8 posted for the Isolate (GC tasks such as the
-// memory reducer, FinalizationRegistry callbacks), which nothing else in v8go
-// runs: call it regularly on a long-lived Isolate. As a consequence:
-//   - JavaScript, and the Go callbacks it calls (e.g. from a
-//     FinalizationRegistry callback), may run during Cleanup;
-//   - Cleanup must not be called from inside a FunctionCallback, or while
-//     JavaScript is otherwise on the stack;
-//   - Undefined and Null must be fetched again after Cleanup, rather than
-//     reused from before the call;
-//   - a TerminateExecution (e.g. from a watchdog) or the heap-limit callback
-//     may take effect while those tasks run, and then affect the next
-//     RunScript or Run.
+// memory reducer), which nothing else in v8go runs: call it regularly on a
+// long-lived Isolate. It never runs JavaScript, nor Go callbacks: the
+// JavaScript a task would run is terminated before its first instruction, so
+// FinalizationRegistry callbacks never run (as in the V8 9.0 fork, which ran
+// no task). A TerminateExecution requested while Cleanup runs is cancelled:
+// the next script runs normally.
+//
+// Like Context.Cleanup, it does nothing when called while JavaScript runs on
+// the Isolate, e.g. from a FunctionCallback.
 func (i *Isolate) Cleanup() {
 	if i.ptr == nil {
 		return
 	}
-	C.IsolateCleanup(i.ptr)
+	if C.IsolateCleanup(i.ptr) == 0 {
+		return
+	}
 	i.null = newValueNull(i)
 	i.undefined = newValueUndefined(i)
 }

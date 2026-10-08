@@ -50,4 +50,16 @@ inline void BotifyContextForget(m_ctx* ctx) {
       kBotifyContextIndex, nullptr, v8::kEmbedderDataTypeTagDefault);
 }
 
+// The isolate whose V8 tasks Isolate.Cleanup runs on this thread, if any
+// (cleanup.cc). Cleanup runs no JavaScript: it terminates the JavaScript a
+// task calls (a FinalizationRegistry callback), but V8 calls a function
+// callback, given directly as a FinalizationRegistry's callback, without
+// checking for termination. Function callbacks then return undefined without
+// calling Go.
+extern constinit thread_local v8::Isolate* botify_cleanup_isolate;
+
+inline bool BotifyInCleanup(v8::Isolate* iso) {
+  return botify_cleanup_isolate == iso;
+}
+
 #endif

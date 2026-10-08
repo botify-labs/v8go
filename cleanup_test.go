@@ -282,25 +282,56 @@ func TestCleanupIsIdempotentAndNilSafe(t *testing.T) {
 	iso.Cleanup() // after Dispose: no-op
 }
 
+// finishesWithin runs f, and fails the test if it hasn't returned after d. It
+// then terminates the JavaScript f is stuck in, so that the test ends.
+func finishesWithin(t *testing.T, iso *v8.Isolate, d time.Duration, what string, f func()) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		f()
+	}()
+	select {
+	case <-done:
+		return
+	case <-time.After(d):
+	}
+	t.Errorf("%s did not return within %v", what, d)
+	for {
+		iso.TerminateExecution()
+		select {
+		case <-done:
+			return
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
+// collectRegistryTarget makes V8 collect the target registered by setup and
+// post the FinalizationRegistry's cleanup task.
+func collectRegistryTarget(t *testing.T, iso *v8.Isolate, ctx *v8.Context, setup string) {
+	t.Helper()
+	if _, err := ctx.RunScript(setup, "registry.js"); err != nil {
+		t.Fatal(err)
+	}
+	iso.LowMemoryNotification()
+}
+
 // V8 posts GC work (memory reducer, GC jobs, ...) and FinalizationRegistry
-// cleanups to the platform's foreground task queue of the isolate.
-// Isolate.Cleanup must run them: v8go never does otherwise, so they piled up
-// in native memory, and the memory reducer never collected old-space garbage
-// on a long-lived isolate (Task 12a soak leak).
-func TestIsolateCleanupRunsPendingPlatformTasks(t *testing.T) {
+// cleanups to the platform's foreground task queue of the isolate, which
+// Isolate.Cleanup runs. It must not run JavaScript though, as the old fork,
+// which never ran these tasks, didn't: the page is done, and nothing would
+// stop a callback that loops.
+func TestIsolateCleanupDoesNotRunFinalizationCallbacks(t *testing.T) {
 	t.Parallel()
 	iso := v8.NewIsolate()
 	defer iso.Dispose()
 	ctx := v8.NewContext(iso)
 	defer ctx.Close()
 
-	const setup = `var cleaned = 0;
+	collectRegistryTarget(t, iso, ctx, `var cleaned = 0;
 var registry = new FinalizationRegistry(() => { cleaned++; });
-(function () { registry.register({}, 1); })();`
-	if _, err := ctx.RunScript(setup, "registry.js"); err != nil {
-		t.Fatal(err)
-	}
-	iso.LowMemoryNotification() // Collects the target, posts the cleanup task.
+(function () { for (let i = 0; i < 10; i++) registry.register({}, i); })();`)
 	ctx.Cleanup()
 	iso.Cleanup()
 
@@ -308,56 +339,123 @@ var registry = new FinalizationRegistry(() => { cleaned++; });
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v.Int32() != 1 {
-		t.Fatalf("FinalizationRegistry callback ran %d times after GC and Cleanup, expected 1: Cleanup doesn't run V8's pending platform tasks", v.Int32())
+	if v.Int32() != 0 {
+		t.Fatalf("Isolate.Cleanup ran JavaScript: %d FinalizationRegistry callbacks", v.Int32())
+	}
+	// The isolate is usable afterwards: Cleanup leaves no termination behind.
+	if v, err := ctx.RunScript("cleaned + 2", "after.js"); err != nil || v.Int32() != 2 {
+		t.Fatalf("after Cleanup: %v, %v", v, err)
 	}
 }
 
-// Tasks pumped by Isolate.Cleanup can run JS that calls Go callbacks. Those
-// may return the Isolate's cached Undefined/Null, which must still be valid
-// then: Cleanup runs the tasks before it releases the internal values.
-func TestIsolateCleanupTaskCallbacksCanReturnUndefinedAndNull(t *testing.T) {
+// A FinalizationRegistry callback that never returns must not hang Cleanup.
+func TestIsolateCleanupDoesNotHangOnLoopingFinalizationCallback(t *testing.T) {
+	t.Parallel()
+	iso := v8.NewIsolate()
+	defer iso.Dispose()
+	ctx := v8.NewContext(iso)
+	defer ctx.Close()
+
+	collectRegistryTarget(t, iso, ctx, `var registry = new FinalizationRegistry(() => { for (;;) {} });
+(function () { registry.register({}, 0); })();
+for (let i = 0; i < 1000; i++) new Array(1000);`)
+	finishesWithin(t, iso, 20*time.Second, "Isolate.Cleanup", iso.Cleanup)
+
+	if v, err := ctx.RunScript("1 + 1", "after.js"); err != nil || v.Int32() != 2 {
+		t.Fatalf("after Cleanup: %v, %v", v, err)
+	}
+}
+
+// Go functions, called directly as the FinalizationRegistry callback or from a
+// JavaScript one, aren't called during Cleanup either, also when their
+// Context is closed (they would get no Context).
+func TestIsolateCleanupDoesNotCallGoFromTasks(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, setup string
+		closeCtx    bool
+	}{
+		{"js callback", `var r = new FinalizationRegistry(() => { goFn(); });`, false},
+		{"go callback", `var r = new FinalizationRegistry(goFn);`, false},
+		{"js callback, closed context", `var r = new FinalizationRegistry(() => { goFn(); });`, true},
+		{"go callback, closed context", `var r = new FinalizationRegistry(goFn);`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			iso := v8.NewIsolate()
+			defer iso.Dispose()
+			calls := 0
+			global := v8.NewObjectTemplate(iso)
+			if err := global.Set("goFn", v8.NewFunctionTemplate(iso, func(*v8.FunctionCallbackInfo) *v8.Value {
+				calls++
+				return v8.Undefined(iso)
+			})); err != nil {
+				t.Fatal(err)
+			}
+			ctx := v8.NewContext(iso, global)
+			collectRegistryTarget(t, iso, ctx, tc.setup+"\n(function () { r.register({}, 1); })();")
+			if tc.closeCtx {
+				ctx.Close()
+			} else {
+				defer ctx.Close()
+			}
+			iso.Cleanup()
+			if calls != 0 {
+				t.Fatalf("Isolate.Cleanup called a Go function %d times", calls)
+			}
+			if !v8.Undefined(iso).IsUndefined() || !v8.Null(iso).IsNull() {
+				t.Fatal("Undefined/Null unusable after Cleanup")
+			}
+		})
+	}
+}
+
+// Context.Cleanup and Isolate.Cleanup release the values of the current call
+// (its receiver, its arguments, the caller's values) when called from a
+// FunctionCallback: they do nothing there.
+func TestCleanupInsideFunctionCallbackIsNoop(t *testing.T) {
 	t.Parallel()
 	iso := v8.NewIsolate()
 	defer iso.Dispose()
 
-	calls := 0
+	var ctxBefore, ctxAfter, isoBefore, isoAfter int
 	global := v8.NewObjectTemplate(iso)
-	if err := global.Set("goUndefined", v8.NewFunctionTemplate(iso, func(*v8.FunctionCallbackInfo) *v8.Value {
-		calls++
-		return v8.Undefined(iso)
-	})); err != nil {
-		t.Fatal(err)
-	}
-	if err := global.Set("goNull", v8.NewFunctionTemplate(iso, func(*v8.FunctionCallbackInfo) *v8.Value {
-		calls++
-		return v8.Null(iso)
+	if err := global.Set("f", v8.NewFunctionTemplate(iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		if _, err := v8.NewValue(iso, "internal"); err != nil {
+			t.Error(err)
+		}
+		ctx := info.Context()
+		ctxBefore, isoBefore = ctx.RetainedValueCount(), iso.InternalRetainedValueCount()
+		ctx.Cleanup()
+		iso.Cleanup()
+		ctxAfter, isoAfter = ctx.RetainedValueCount(), iso.InternalRetainedValueCount()
+		return info.Args()[0]
 	})); err != nil {
 		t.Fatal(err)
 	}
 	ctx := v8.NewContext(iso, global)
 	defer ctx.Close()
 
-	const setup = `var u = 0, n = 0;
-var registry = new FinalizationRegistry(() => { u = goUndefined(); n = goNull(); });
-(function () { registry.register({}, 1); })();`
-	if _, err := ctx.RunScript(setup, "registry.js"); err != nil {
-		t.Fatal(err)
-	}
-	iso.LowMemoryNotification() // Collects the target, posts the cleanup task.
-	iso.Cleanup()               // Runs the task: the callbacks return Undefined/Null.
-
-	if calls != 2 {
-		t.Fatalf("expected 2 Go callback calls during Cleanup, got %d", calls)
-	}
-	v, err := ctx.RunScript("u === undefined && n === null", "check.js")
+	v, err := ctx.RunScript("f(41) + 1", "cb.js")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !v.Boolean() {
-		t.Fatal("callbacks run during Cleanup returned a released Undefined/Null")
+	if v.Int32() != 42 {
+		t.Fatalf("expected 42, got %v", v)
 	}
-	if !v8.Undefined(iso).IsUndefined() || !v8.Null(iso).IsNull() {
-		t.Fatal("Undefined/Null unusable after Cleanup")
+	if ctxAfter != ctxBefore {
+		t.Errorf("Context.Cleanup inside a callback released values: %d -> %d", ctxBefore, ctxAfter)
+	}
+	if isoAfter != isoBefore {
+		t.Errorf("Isolate.Cleanup inside a callback released values: %d -> %d", isoBefore, isoAfter)
+	}
+
+	// Outside a callback, both still release them.
+	ctx.Cleanup()
+	iso.Cleanup()
+	if n := ctx.RetainedValueCount(); n != 0 {
+		t.Errorf("Context.Cleanup outside a callback: %d values left", n)
+	}
+	if n := iso.InternalRetainedValueCount(); n >= isoBefore {
+		t.Errorf("Isolate.Cleanup outside a callback: %d internal values left (%d before)", n, isoBefore)
 	}
 }

@@ -3,7 +3,9 @@ package v8go_test
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	v8 "github.com/botify-labs/v8go"
 )
@@ -181,5 +183,102 @@ func TestFunctionCallbackResultsAndErrors(t *testing.T) {
 			!strings.Contains(err.Error(), fmt.Sprintf("type error %d", n)) {
 			t.Errorf("%d arguments: uncaught exception gave error %v", n, err)
 		}
+	}
+}
+
+// A function of a closed Context can still be called, from another Context
+// that holds it: it throws instead of calling Go without a Context.
+func TestFunctionCallbackOfClosedContextThrows(t *testing.T) {
+	t.Parallel()
+	iso := v8.NewIsolate()
+	defer iso.Dispose()
+
+	calls := 0
+	global := v8.NewObjectTemplate(iso)
+	if err := global.Set("f", v8.NewFunctionTemplate(iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		calls++
+		return info.Args()[0]
+	})); err != nil {
+		t.Fatal(err)
+	}
+	ctx1 := v8.NewContext(iso, global)
+	ctx2 := v8.NewContext(iso)
+	defer ctx2.Close()
+
+	f, err := ctx1.Global().Get("f")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ctx2.Global().Set("g", f); err != nil {
+		t.Fatal(err)
+	}
+	if v, err := ctx2.RunScript("g(1)", "open.js"); err != nil || v.Int32() != 1 || calls != 1 {
+		t.Fatalf("call while open: %v, %v, %d calls", v, err, calls)
+	}
+	ctx1.Close()
+
+	// The Error comes from the closed context's realm: not instanceof this one's.
+	v, err := ctx2.RunScript("(() => { try { g(2); return 'returned' } catch (e) { return e.name + ': ' + e.message } })()", "closed.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.String() != "Error: v8go: context closed" {
+		t.Fatalf("call of a closed context's function: %q, expected a 'context closed' Error", v.String())
+	}
+	if calls != 1 {
+		t.Fatalf("the Go callback was called without its Context (%d calls)", calls)
+	}
+	if _, err := ctx2.RunScript("g(3)", "uncaught.js"); err == nil || !strings.Contains(err.Error(), "context closed") {
+		t.Fatalf("uncaught: %v", err)
+	}
+}
+
+// A callback whose nested script was terminated returns its error: the
+// termination must go on, not become an exception the caller's JavaScript can
+// catch, which would let `for (;;) { try { nested() } catch (e) {} }` survive
+// TerminateExecution.
+func TestTerminateExecutionNotSwallowedByCallbackError(t *testing.T) {
+	t.Parallel()
+	iso := v8.NewIsolate()
+	defer iso.Dispose()
+
+	var ctx *v8.Context
+	var stop atomic.Bool // Ends the outer script if the test fails.
+	global := v8.NewObjectTemplate(iso)
+	if err := global.Set("nested", v8.NewFunctionTemplateWithError(iso, func(*v8.FunctionCallbackInfo) (*v8.Value, error) {
+		if stop.Load() {
+			return v8.NewValue(iso, "stop")
+		}
+		_, err := ctx.RunScript("for (;;) {}", "nested.js")
+		if err == nil {
+			err = fmt.Errorf("nested script returned")
+		}
+		return nil, err
+	})); err != nil {
+		t.Fatal(err)
+	}
+	ctx = v8.NewContext(iso, global)
+	defer ctx.Close()
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := ctx.RunScript("for (;;) { try { if (nested() === 'stop') break } catch (e) {} }", "outer.js")
+		done <- err
+	}()
+	time.Sleep(100 * time.Millisecond)
+	iso.TerminateExecution()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("terminated script returned no error")
+		}
+	case <-time.After(5 * time.Second):
+		stop.Store(true)
+		iso.TerminateExecution() // Ends the nested loop.
+		<-done
+		t.Fatal("TerminateExecution was swallowed: the outer script still ran")
+	}
+	if v, err := ctx.RunScript("1 + 1", "after.js"); err != nil || v.Int32() != 2 {
+		t.Fatalf("after termination: %v, %v", v, err)
 	}
 }

@@ -218,6 +218,11 @@ func goFunctionCallback(
 	argsCount int,
 ) (rval C.ValuePtr, rerr C.ValuePtr) {
 	ctx := getContext(ctxref)
+	if ctx == nil {
+		// Botify: the Context is closed. FunctionTemplateCallback throws
+		// before calling Go then; never dereference a nil Context.
+		return nil, nil
+	}
 
 	this := *thisAndArgs
 	argv := (*[1 << 30]C.ValuePtr)(unsafe.Pointer(thisAndArgs))[1 : argsCount+1 : argsCount+1]

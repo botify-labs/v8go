@@ -19,6 +19,11 @@ void FunctionTemplateCallback(const FunctionCallbackInfo<Value>& info) {
   // this thread: a Locker and an Isolate::Scope would only cost time.
   HandleScope handle_scope(iso);
 
+  // Botify: Isolate.Cleanup runs no page code, Go included (botify_context.h).
+  if (BotifyInCleanup(iso)) {
+    return;
+  }
+
   // This callback function can be called from any Context, which we only know
   // at runtime. We extract the Context reference from the embedder data so that
   // we can use the context registry to match the Context on the Go side
@@ -30,6 +35,13 @@ void FunctionTemplateCallback(const FunctionCallbackInfo<Value>& info) {
   m_ctx* ctx = BotifyContextGet(iso, local_ctx);
   if (ctx == nullptr) {
     ctx = goContext(ctx_ref);
+  }
+  // Botify: the function's Context is closed, but JS still holds the function
+  // (e.g. another Context it was passed to). There is no Go Context to call
+  // the callback with.
+  if (ctx == nullptr) {
+    iso->ThrowError("v8go: context closed");
+    return;
   }
 
   int callback_ref = info.Data().As<Integer>()->Value();
@@ -61,6 +73,13 @@ void FunctionTemplateCallback(const FunctionCallbackInfo<Value>& info) {
 
   goFunctionCallback_return retval =
       goFunctionCallback(ctx_ref, callback_ref, thisAndArgs, count - 1);
+  // Botify: a script the callback ran was terminated, and the termination
+  // goes on through the caller's frames. The callback's error is that
+  // termination's: thrown, it would replace the termination with an exception
+  // the caller's JS could catch, and go on running.
+  if (iso->IsExecutionTerminating()) {
+    return;
+  }
   if (retval.r1 != nullptr) {
     iso->ThrowException(retval.r1->ptr.Get(iso));
   } else if (retval.r0 != nullptr) {

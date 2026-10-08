@@ -20,8 +20,10 @@ typedef v8Isolate* IsolatePtr;
 typedef struct m_ctx m_ctx;
 typedef m_ctx* ContextPtr;
 
+// Both do nothing when called with JavaScript of the isolate on the stack
+// (from a FunctionCallback): IsolateCleanup then returns 0, otherwise 1.
 extern void ContextCleanup(ContextPtr ctx);
-extern void IsolateCleanup(IsolatePtr iso);
+extern int IsolateCleanup(IsolatePtr iso);
 extern int IsolateInternalRetainedValueCount(IsolatePtr iso);
 extern int IsolateInternalUnboundScriptCount(IsolatePtr iso);
 
