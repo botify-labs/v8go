@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Pins the deps/<os>_<arch> modules required by go.mod to a commit already
-# pushed to github.com/botify-labs/v8go. Usage: tools/pin_deps.sh <commit-sha>
+# pushed to github.com/botify-labs/v8go, or to a release of those modules.
+# Usage: tools/pin_deps.sh <commit>|<version>
+#   <commit>:  a commit of this clone (full or abbreviated sha, branch, tag...),
+#              pinned as a pseudo-version, or as a release when the commit
+#              carries the deps/<os>_<arch>/vX.Y.Z tags;
+#   <version>: vX.Y.Z, i.e. the tags deps/<os>_<arch>/vX.Y.Z (one per module,
+#              all on the same commit), pinned as vX.Y.Z (BOTIFY.md, "Publier
+#              une version").
 # Consumers get the bridges from these pinned modules, not from deps/ in the
 # commit they require: the commit must contain the bridges of the current
 # sources (its deps/*/bridge.sha256 equal to tools/bridge_hash.sh), i.e. it is
@@ -11,27 +18,47 @@
 # bench/go.mod gets the same versions: it replaces the deps modules with the
 # local directories, but its requirements must still match the root module's.
 set -euo pipefail
-SHA=${1:?usage: tools/pin_deps.sh <pushed-commit-sha>}
+ARG=${1:?usage: tools/pin_deps.sh <pushed commit>|<vX.Y.Z>}
 cd "$(git rev-parse --show-toplevel)"
 export GOWORK=off GOPROXY=direct GOFLAGS=-mod=mod
+
+# rev_of <deps dir>: the commit to pin for that module, as a full sha (Go gets
+# the full sha too, or the version).
+if [[ "$ARG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  rev_of() {
+    git rev-parse -q --verify "refs/tags/$1/$ARG^{commit}" || {
+      echo "no tag $1/$ARG in this clone (git fetch --tags?)" >&2
+      return 1
+    }
+  }
+  query() { echo "$ARG"; }
+else
+  SHA=$(git rev-parse -q --verify "$ARG^{commit}") || {
+    echo "$ARG: no such commit in this clone, or an ambiguous abbreviation (git fetch? full sha?)" >&2
+    exit 1
+  }
+  rev_of() { echo "$SHA"; }
+  query() { echo "$SHA"; }
+fi
 
 want=$(tools/bridge_hash.sh)
 for gomod in deps/*_*/go.mod; do
   d=$(dirname "$gomod")
-  got=$(git show "$SHA:$d/bridge.sha256" 2>/dev/null || echo "missing (git fetch?)")
+  rev=$(rev_of "$d")
+  got=$(git show "$rev:$d/bridge.sha256" 2>/dev/null || echo missing)
   if [ "$got" != "$want" ]; then
-    echo "$SHA:$d/bridge.sha256 is $got, the sources are $want: pin the bridge commit" >&2
+    echo "$rev:$d/bridge.sha256 is $got, the sources are $want: pin the bridge commit" >&2
     exit 1
   fi
-  if [ "$(git rev-parse "$SHA:$d")" != "$(git rev-parse "HEAD:$d")" ]; then
-    echo "$SHA:$d differs from HEAD's (git diff $SHA HEAD -- $d): pin a commit whose $d is HEAD's" >&2
+  if [ "$(git rev-parse "$rev:$d")" != "$(git rev-parse "HEAD:$d")" ]; then
+    echo "$rev:$d differs from HEAD's (git diff $rev HEAD -- $d): pin a commit whose $d is HEAD's" >&2
     exit 1
   fi
 done
 
 for gomod in deps/*_*/go.mod; do
   mod="github.com/botify-labs/v8go/$(dirname "$gomod")"
-  ver=$(go list -m -f '{{.Version}}' "$mod@$SHA")
+  ver=$(go list -m -f '{{.Version}}' "$mod@$(query)")
   go mod edit -require="$mod@$ver"
   go mod edit -require="$mod@$ver" bench/go.mod
   echo "$mod $ver"
