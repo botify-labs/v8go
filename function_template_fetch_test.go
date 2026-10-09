@@ -16,7 +16,7 @@ import (
 	"net/http"
 	"strings"
 
-	v8 "rogchap.com/v8go"
+	v8 "github.com/botify-labs/v8go"
 )
 
 func ExampleFunctionTemplate_fetch() {

@@ -1,0 +1,5 @@
+=== RUN   TestSoakCleanup
+    soak_test.go:118: baseline: RSS 59 -> 72 MiB, second-half growth -0.57%, V8 heap last 17113 KiB, Go heap last 389 KiB
+--- PASS: TestSoakCleanup (22.22s)
+PASS
+ok  	github.com/botify-labs/v8go/bench	22.225s

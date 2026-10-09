@@ -1,0 +1,149 @@
+CallGoFromJS1000: instructions per unit ((Ir@40 ops - Ir@20 ops) / 20000)
+
+variant  total
+base         8841
+v0          10568
+v1           8653
+v2           7981
+v3           7229
+v4           6857
+
+By category (self cost):
+category                     base       v0       v1       v2       v3       v4
+V8                           2840     2156     2039     2127     1702     1717
+libc malloc/free             2427     4048     2834     2755     2442     2056
+cgo transitions              1696     1729     1729     1329     1329     1329
+other                         810      519      327      224      266      241
+v8go C++                      577     1131      756      694      629      629
+Go runtime other              345      345      332      276      279      296
+Go alloc/GC                   107      112      109      102      108      156
+v8go Go                        40      528      528      474      474      432
+
+Top functions (self cost per callback, union of each variant's top 45):
+     base       v0       v1       v2       v3       v4  function
+      516     1030      515      515      518      518  _int_malloc
+      379      819      443      442      379      379  _int_free
+      606      604      606      608      606      121  runtime.mallocgcSmallScanNoHeaderSC2
+      491        0        0        0        0        0  v8::internal::GlobalHandles::Create(v8::internal::Object)
+      191      426      341      308      191      302  malloc
+      217      421      207      206      207      207  malloc_consolidate
+        0      414      414      414      260      260  v8::internal::GlobalHandles::Create(v8::internal::Tagged<v8::internal::Object>)
+      365      365      365      292      292      292  runtime.reentersyscall
+        0      331      331      269      204      204  FunctionTemplateCallback(v8::FunctionCallbackInfo<v8::Value> const&)
+      304       42       42       42       24       24  v8::internal::GlobalHandles::Destroy(unsigned long*)
+        0      296        0        0        0        0  std::__Cr::__hash_table<std::__Cr::__hash_value_type<long, m_value*>, std::__Cr::__unordered_map_hasher<long, std::__Cr::pair<long const, m_value*>, s
+      295      295      295      236      236      236  runtime.exitsyscall
+      284        0        0        0        0        0  FunctionTemplateCallback
+        0      266      266      266      152      152  v8::internal::GlobalHandles::NodeSpace<v8::internal::GlobalHandles::Node>::Release(v8::internal::GlobalHandles::Node*)
+      210        0        0        0        0        0  v8::V8::GlobalizeReference(v8::internal::Isolate*, unsigned long*)
+       62      144      199      163       62      161  free
+       93      169       89       88       89       88  unlink_chunk.constprop.0
+      168        0        0        0        0        0  v8::internal::MaybeHandle<v8::internal::Object> v8::internal::(anonymous namespace)::HandleApiCallHelper<false>(v8::internal::Isolate*, v8::internal::
+        0      168        9        3        2       -1  __memset_avx2_unaligned_erms
+        0      154      154      153      154      112  github.com/botify-labs/v8go.goFunctionCallback
+       52      154       85       85       68       69  operator new(unsigned long)
+      150      150      150       75       75       75  runtime.cgocallbackg1
+      134      150      150      150      150      150  ValueToInt32
+       44      100      148      148      148      148  tracked_value(m_ctx*, m_value*)
+      146        0        0        0        0        0  rogchap.com/v8go.goFunctionCallback
+       -0        0        0        0        0      137  runtime.mallocgcSmallScanNoHeader
+      132      131      132      132      132        0  runtime.mallocgcSmallScanNoHeaderSC5
+       96      124      124      124       93       93  v8::internal::Isolate::Enter()
+        0        0      122        0        0        0  0x000000008c0001a6
+        0      116      116      116       87       87  v8::internal::Heap::SetStackStart()
+      114      114      114      114      114      114  runtime.cgocall
+      112        0        0        0        0        0  v8::HandleScope::Initialize(v8::Isolate*)
+      111      111      111       74       74       74  runtime.mapaccess2_fast64
+      106      106      106       53       53       53  runtime.cgocallback.abi0
+      105      105       80      105      105      105  Builtins_InterpreterEntryTrampoline
+        0      103        0        0        0        0  void std::__Cr::__hash_table<std::__Cr::__hash_value_type<long, m_value*>, std::__Cr::__unordered_map_hasher<long, std::__Cr::pair<long const, m_value
+       99       99       99       99       99       99  runtime.asmcgocall.abi0
+       90       80       80       80       80       80  v8::Context::Enter()
+       90        0        0        0        0        0  v8::HandleScope::CreateHandle(v8::internal::Isolate*, unsigned long)
+       90       90       90       72       72       72  runtime.save
+       86       86       86       86       86        0  runtime.mallocgcSmallScanNoHeaderSC1
+       84       84       84       84       84       84  runtime.cgoCheckPointer
+        0       84       60       60       60       60  ContextFree
+       80       82       78       74       79       13  runtime.mallocgcSmallScanSlowPath
+       80       36       36       36       27       27  v8::internal::ThreadId::GetCurrentThreadId()
+       78        0        0        0        0        0  rogchap.com/v8go.getContext
+        0       78       78       39       39       39  github.com/botify-labs/v8go.getContext
+       76       72       72       72       54       54  v8::Locker::Initialize(v8::Isolate*)
+       76        0        0        0        0        0  v8::internal::Builtin_HandleApiCall(int, unsigned long*, v8::internal::Isolate*)
+       46       69       69       46       46       46  runtime.cgoCheckResult
+       68        0        0       -0       -0        0  pthread_getspecific@@GLIBC_2.34
+       67       67       67       67       67       67  NewValueInteger
+       -0        0        0        0        0       64  runtime.(*mspan).writeHeapBitsSmall
+        0       63       63       63       63       63  github.com/botify-labs/v8go.NewValue
+       61        0        0        0        0        0  rogchap.com/v8go.NewValue
+       50       60       60       50       50       50  runtime.cgoCheckArg
+       60       56       56       56       56       56  v8::Context::Exit()
+       55       38       29       38       38       38  Builtins_TestLessThanHandler
+       39       39       39       39       39       55  runtime.mallocgc
+        0       52       52       52       39       39  v8::base::Stack::GetStackStart()
+        0       51       39       51       51       51  Builtins_CallApiCallbackGeneric
+       50       50       50       25       25       25  crosscall2
+       14       50       50       50       50       50  v8::Value::Int32Value(v8::Local<v8::Context>) const
+       48        0        0        0        0        0  ContextCleanup
+       33       47       36       47       47       47  Builtins_JumpLoopHandler
+       46       28       28       28       28       28  v8::TryCatch::~TryCatch()
+       41       43       41       39       41       46  runtime.tryDeferToSpanScan
+       42       44       44       44       44       44  v8::TryCatch::TryCatch(v8::Isolate*)
+        0       44       44       44       44       44  github.com/botify-labs/v8go.(*Value).Int32
+       43       43       43       44       43       43  runtime.mallocgcTinySC2
+       43       43       33       43       43       43  Builtins_IncHandler
+
+Inclusive cost per callback of v8go entry points:
+     base       v0       v1       v2       v3       v4  function
+        0 35828231 17410234  6983836  7952149  9405272  FunctionTemplateCallback(v8::FunctionCallbackInfo<v8::Value> const&)
+  7903797 23887875 13705040  6982018  7950975  9403997  crosscall2
+        0 11945041  2815460  6983730  7952146  9405271  Builtins_CallApiCallbackGeneric
+  3948789 11945017  6854754  6982046  7951002  9404025  goFunctionCallback
+  3955053 11942902  6850333        0        0        0  goContext
+ 11857362        0        0        0        0        0  FunctionTemplateCallback
+        0        0  4039297      -17        0        0  Builtins_CallApiCallbackOptimizedNoProfiling
+  3949070        0        0        0        0        0  v8::internal::MaybeHandle<v8::internal::Object> v8::internal::(anonymous namespace)::HandleApiCallHelper<false>(v8::internal::Isolate*, v8::internal::
+        0    23296    14638    13877    16171        0  _cgoexp_9d8bc4c18e9f_goFunctionCallback
+    11182    21600    20842    20131    14441    16959  runtime.cgocall
+        0    13699    14464    13703     9996    11445  github.com/botify-labs/v8go.goFunctionCallback
+        0        0        0        0        0    11619  _cgoexp_7f3af6e886fe_goFunctionCallback
+        0    10788    11571    10829     7094     9173  github.com/botify-labs/v8go.NewValue
+     4349        0        0        0        0        0  _cgoexp_37b7bd1512aa_goFunctionCallback
+     4254        0        0        0        0        0  rogchap.com/v8go.goFunctionCallback
+        0      312      237     1963     1322     1419  Builtins_HandleApiCallOrConstruct
+     1534        0        0        0        0        0  rogchap.com/v8go.(*Value).Int32
+     1414        0        0        0        0        0  rogchap.com/v8go._Cfunc_ValueToInt32.abi0
+        0     1396     1396     1396     1396     1396  github.com/botify-labs/v8go.(*Value).Int32
+      147     1386      187      187      187      187  tracked_value(m_ctx*, m_value*)
+        0     1276     1276     1276     1276     1276  github.com/botify-labs/v8go._Cfunc_ValueToInt32.abi0
+     1264      678      678      678      678      678  ValueToInt32
+     1236        0        0        0        0        0  rogchap.com/v8go.NewValue
+        0     1115      859      850      843      875  github.com/botify-labs/v8go._Cfunc_NewValueInteger.abi0
+     1011      816      560      551      544      576  NewValueInteger
+      978        0        0        0        0        0  rogchap.com/v8go._Cfunc_NewValueInteger.abi0
+      868        0        0        0        0        0  /tmp/go-build/cgo-gcc-prolog:_cgo_37b7bd1512aa_Cfunc_ValueToInt32
+        0      843      587      578      571        0  /tmp/go-build/cgo-gcc-prolog:_cgo_9d8bc4c18e9f_Cfunc_NewValueInteger
+        0      730      730      730      730        0  /tmp/go-build/cgo-gcc-prolog:_cgo_9d8bc4c18e9f_Cfunc_ValueToInt32
+        0        0        0        0        0      730  /tmp/go-build/cgo-gcc-prolog:_cgo_7f3af6e886fe_Cfunc_ValueToInt32
+      706        0        0        0        0        0  /tmp/go-build/cgo-gcc-prolog:_cgo_37b7bd1512aa_Cfunc_NewValueInteger
+        0        0        0        0        0      603  /tmp/go-build/cgo-gcc-prolog:_cgo_7f3af6e886fe_Cfunc_NewValueInteger
+      544        0        0        0        0        0  Builtins_HandleApiCall
+      200      308      308      308      231      231  v8::Isolate::Enter()
+        0      301      301        0        0        0  _cgoexp_9d8bc4c18e9f_goContext
+      294        0        0        0        0        0  _cgoexp_37b7bd1512aa_goContext
+      184      292      292      292      219      219  v8::internal::Isolate::Enter()
+      212        0        0        0        0        0  rogchap.com/v8go.getContext
+        0      212      212      106      106      106  github.com/botify-labs/v8go.getContext
+      180        0        0        0        0        0  v8::HandleScope::Initialize(v8::Isolate*)
+      117      109      109      109       82       82  v8::Locker::Initialize(v8::Isolate*)
+        0       99       99       99       99       99  github.com/botify-labs/v8go.(*Isolate).getCallback
+       99        0        0        0        0        0  rogchap.com/v8go.(*Isolate).getCallback
+       90       80       80       80       80       80  v8::Context::Enter()
+       78       64       64       64       64       64  v8::TryCatch::TryCatch(v8::Isolate*)
+       60       56       56       56       56       56  v8::Context::Exit()
+       44       48       48       48       36       36  v8::Isolate::Exit()
+        0       42       42       21       21       21  github.com/botify-labs/v8go.getContext.deferwrap1
+       42        0        0        0        0        0  rogchap.com/v8go.getContext.deferwrap1
+       28       32       32       32       24       24  v8::internal::Isolate::Exit()
+        0       21       21       21       21       21  github.com/botify-labs/v8go.(*Isolate).getCallback.deferwrap1
+       21        0        0        0        0        0  rogchap.com/v8go.(*Isolate).getCallback.deferwrap1

@@ -1,0 +1,96 @@
+goos: windows
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: AMD EPYC 9V45 96-Core Processor                
+                             │ bench-windows-latest/new.txt │
+                             │            sec/op            │
+NewIsolate-4                                   897.2µ ±  4%
+NewContext-4                                   230.6µ ±  1%
+RunScriptTrivial-4                             1.155µ ±  1%
+CallJSFromGo-4                                 1.153µ ±  5%
+CallGoFromJS1000-4                             992.1µ ±  7%
+NewValueString-4                               502.5n ±  5%
+ValueToGoString-4                              2.336µ ±  3%
+ObjectSetGet-4                                 1.568µ ± 11%
+JSONParse-4                                    38.00µ ±  1%
+JSONStringify-4                                32.35µ ±  1%
+Cleanup1000Values-4                            29.12µ ±  5%
+CompileLodashCold-4                            3.165m ±  6%
+CompileLodashWithCodeCache-4                   382.2µ ± 10%
+StartupWithLodash-4                            4.721m ±  2%
+JSRegex-4                                      39.64µ ±  3%
+JSObjects-4                                    633.7µ ± 78%
+JSArrays-4                                     5.492m ±  6%
+JSStrings-4                                    480.1µ ±  4%
+JSJSON-4                                       813.5µ ±  1%
+HeapPerIsolate-4                               1.263m ±  3%
+HeapPerContext-4                               13.14m ±  4%
+geomean                                        124.0µ
+
+                             │ bench-windows-latest/new.txt │
+                             │             B/op             │
+NewIsolate-4                                   176.0 ± 0%
+NewContext-4                                   80.00 ± 0%
+RunScriptTrivial-4                             16.00 ± 0%
+CallJSFromGo-4                                 68.00 ± 0%
+CallGoFromJS1000-4                           135.7Ki ± 0%
+NewValueString-4                               32.00 ± 0%
+ValueToGoString-4                              272.0 ± 0%
+ObjectSetGet-4                                 36.00 ± 0%
+JSONParse-4                                    16.00 ± 0%
+JSONStringify-4                              16.00Ki ± 0%
+Cleanup1000Values-4                            0.000 ± 0%
+CompileLodashCold-4                          2.777Ki ± 5%
+CompileLodashWithCodeCache-4                   16.00 ± 0%
+StartupWithLodash-4                            304.0 ± 0%
+JSRegex-4                                      16.00 ± 0%
+JSObjects-4                                    16.00 ± 0%
+JSArrays-4                                     16.00 ± 0%
+JSStrings-4                                    16.00 ± 0%
+JSJSON-4                                       16.00 ± 0%
+HeapPerIsolate-4                               272.0 ± 0%
+HeapPerContext-4                             4.859Ki ± 0%
+geomean                                                   ¹
+¹ summaries must be >0 to compute geomean
+
+                             │ bench-windows-latest/new.txt │
+                             │          allocs/op           │
+NewIsolate-4                                   5.000 ± 0%
+NewContext-4                                   5.000 ± 0%
+RunScriptTrivial-4                             1.000 ± 0%
+CallJSFromGo-4                                 5.000 ± 0%
+CallGoFromJS1000-4                            7.746k ± 0%
+NewValueString-4                               2.000 ± 0%
+ValueToGoString-4                              2.000 ± 0%
+ObjectSetGet-4                                 2.000 ± 0%
+JSONParse-4                                    1.000 ± 0%
+JSONStringify-4                                1.000 ± 0%
+Cleanup1000Values-4                            0.000 ± 0%
+CompileLodashCold-4                            1.000 ± 0%
+CompileLodashWithCodeCache-4                   1.000 ± 0%
+StartupWithLodash-4                            13.00 ± 0%
+JSRegex-4                                      1.000 ± 0%
+JSObjects-4                                    1.000 ± 0%
+JSArrays-4                                     1.000 ± 0%
+JSStrings-4                                    1.000 ± 0%
+JSJSON-4                                       1.000 ± 0%
+HeapPerIsolate-4                               11.00 ± 0%
+HeapPerContext-4                               305.0 ± 0%
+geomean                                                   ¹
+¹ summaries must be >0 to compute geomean
+
+                             │ bench-windows-latest/new.txt │
+                             │             B/s              │
+JSONParse-4                                    376.5Mi ± 1%
+JSONStringify-4                                442.2Mi ± 1%
+CompileLodashCold-4                            164.0Mi ± 6%
+CompileLodashWithCodeCache-4                   1.326Gi ± 9%
+geomean                                        438.8Mi
+
+                 │ bench-windows-latest/new.txt │
+                 │          heapB/iso           │
+HeapPerIsolate-4                    191.4k ± 0%
+
+                 │ bench-windows-latest/new.txt │
+                 │          heapB/ctx           │
+HeapPerContext-4                    88.31k ± 0%

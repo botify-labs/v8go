@@ -1,20 +1,74 @@
-# Execute JavaScript from Go
+# v8go (Botify fork): execute JavaScript from Go
 
-<a href="https://github.com/rogchap/v8go/releases"><img src="https://img.shields.io/github/v/release/rogchap/v8go" alt="Github release"></a>
-[![Go Report Card](https://goreportcard.com/badge/rogchap.com/v8go)](https://goreportcard.com/report/rogchap.com/v8go)
-[![Go Reference](https://pkg.go.dev/badge/rogchap.com/v8go.svg)](https://pkg.go.dev/rogchap.com/v8go)
-[![CI](https://github.com/rogchap/v8go/workflows/CI/badge.svg)](https://github.com/rogchap/v8go/actions?query=workflow%3ACI)
-![V8 Build](https://github.com/rogchap/v8go/workflows/V8%20Build/badge.svg)
-[![codecov](https://codecov.io/gh/rogchap/v8go/branch/master/graph/badge.svg?token=VHZwzGm3dV)](https://codecov.io/gh/rogchap/v8go)
-[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B22862%2Fgit%40github.com%3Arogchap%2Fv8go.git.svg?type=shield)](https://app.fossa.com/projects/custom%2B22862%2Fgit%40github.com%3Arogchap%2Fv8go.git?ref=badge_shield)
-[![#v8go Slack Channel](https://img.shields.io/badge/slack-%23v8go-4A154B?logo=slack)](https://gophers.slack.com/channels/v8go)
+[![Go Reference](https://pkg.go.dev/badge/github.com/botify-labs/v8go.svg)](https://pkg.go.dev/github.com/botify-labs/v8go)
 
-<img src="gopher.jpg" width="200px" alt="V8 Gopher based on original artwork from the amazing Renee French" />
+<img src="gopher.jpg" width="200px" alt="V8 Gopher based on original artwork from the amazing Renee French" style="float:right" />
+
+`github.com/botify-labs/v8go` is Botify's fork of v8go, the Go binding to the
+[V8](https://v8.dev/) JavaScript engine. It is a snapshot of
+[tommie/v8go](https://github.com/tommie/v8go) (commit in `deps/tommie_sha`), itself a fork of
+[rogchap/v8go](https://github.com/rogchap/v8go), with **V8 15.4.80.20**, renamed to the module path
+`github.com/botify-labs/v8go`, plus the Botify additions below. It replaces the older Botify fork of
+`rogchap.com/v8go` (V8 9.0): see [MIGRATION.md](MIGRATION.md).
+
+```sh
+go get github.com/botify-labs/v8go@v0.10.0   # once v0.10.0 is released (CHANGELOG.md)
+```
+
+## Requirements
+
+V8 and v8go's C++ bridge ship prebuilt in the `deps/<os>_<arch>` modules and link statically.
+Consumers compile no C++ for v8go.
+
+| | Linux, macOS | Windows |
+|---|---|---|
+| Go | the version in `go.mod` | ≥ 1.27 |
+| C compiler | any (system gcc or clang), no flags, no `CGO_CXXFLAGS` | MSVC-target clang (LLVM ≥ 21), with MSVC Build Tools and the Windows SDK |
+| Environment | nothing | `CC="clang -fuse-ld=lld"`, `CXX="clang++ -fuse-ld=lld"`, clang on `PATH` |
+| C runtime | system libc | static MSVC CRT (`/MT`); **MinGW is not supported** |
+
+Windows notes: `-fuse-ld=lld` must be in `CC` (or passed with `-ldflags=-extldflags=-fuse-ld=lld`)
+for Go to detect LLD, otherwise it passes flags only GNU ld accepts. Go splits `CC` on spaces, so
+clang must be found on `PATH` rather than given as a full path. Every other cgo dependency of the
+binary must be MSVC-compatible too: see [CGO-DEPENDENCIES.md](CGO-DEPENDENCIES.md).
+
+### Platforms
+
+linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64.
+
+## Botify additions
+
+- **Prebuilt C++ bridge**: the `.cc` files only compile with `-tags v8go_source`; consumers link
+  `deps/<os>_<arch>/libv8go.a` (`v8go.lib` on Windows), checked against the sources by CI.
+- **`Isolate.Cleanup` / `Context.Cleanup`**: release the values and scripts a long-lived isolate or
+  context tracks, and run V8's pending GC tasks (memory reducer). Cleanup never runs JavaScript or Go
+  callbacks, and does nothing when called with JavaScript on the stack.
+- **`SetDefaultLocale`**: pins the default locale of V8's ICU, process-wide, so that `Intl` and the
+  locale-sensitive methods don't depend on the host's locale.
+- **Faster JS→Go calls**: indexed value tracking, the context found without a call into Go, one
+  allocation per call up to 4 arguments, plus guards for callbacks of closed contexts and terminated
+  nested scripts.
+- **C++ runtime isolation on Linux**: V8's copy of Chromium's libc++abi/libc++ ABI layer is renamed
+  (`.v8cr` suffix) in the Linux archives, so binaries also linking g++/libstdc++ C++ work, fully static
+  included.
+- **No allocator shim**: PartitionAlloc's malloc replacement is removed from V8's archives; the
+  process keeps the system `malloc`.
+
+## Documentation
+
+- [MIGRATION.md](MIGRATION.md): migrating from the old fork (`rogchap.com/v8go`, V8 9.0): toolchains,
+  glibc, memory, behaviour and API changes (in French).
+- [CGO-DEPENDENCIES.md](CGO-DEPENDENCIES.md): other cgo libraries next to V8 (static linking, MSVC
+  rebuilds, linux/arm64 archives), and checks for new ones (in French).
+- [BOTIFY.md](BOTIFY.md): how the fork works: prebuilt bridges, pinned `deps/*` modules, release
+  procedure, V8 upgrades, benchmarks (in French).
+- [CHANGELOG.md](CHANGELOG.md): Botify releases, then tommie/v8go's history.
+- Go reference: https://pkg.go.dev/github.com/botify-labs/v8go
 
 ## Usage
 
 ```go
-import v8 "rogchap.com/v8go"
+import v8 "github.com/botify-labs/v8go"
 ```
 
 ### Running a script
@@ -76,7 +130,7 @@ val, err := ctx.RunScript(src, filename)
 if err != nil {
   e := err.(*v8.JSError) // JavaScript errors will be returned as the JSError struct
   fmt.Println(e.Message) // the message of the exception thrown
-  fmt.Println(e.Location) // the filename, line number and the column where the error occured
+  fmt.Println(e.Location) // the filename, line number and the column where the error occurred
   fmt.Println(e.StackTrace) // the full stack trace of the error, if available
 
   fmt.Printf("javascript error: %v", e) // will format the standard error message
@@ -126,14 +180,38 @@ case val := <- vals:
     // success
 case err := <- errs:
     // javascript error
-case <- time.After(200 * time.Milliseconds):
+case <- time.After(200 * time.Millisecond):
     vm := ctx.Isolate() // get the Isolate from the context
     vm.TerminateExecution() // terminate the execution
     err := <- errs // will get a termination error back from the running script
 }
 ```
 
+### Setting memory limits
+V8 supports setting a hard limit on Javascript memory usage.
+To do so, add a call to `WithResourceConstraints` to the `NewIsolate` invocation.
+If the limit is hit, v8go terminates the running script, like `TerminateExecution` above, instead of letting V8 end the process.
+The error matches `v8.ErrHeapLimitReached`. The isolate can be used again, with its initial limit restored, but the state the interrupted script left behind is undefined: recycling the isolate is recommended.
+
+```go
+vm := v8.NewIsolate(v8.WithResourceConstraints(8*1024*1024, 16*1024*1024))
+ctx := v8.NewContext(vm)
+val, err = ctx.RunScript(`
+    const data = [];
+    for (let i = 0; i < 1000 * 1000; i++) {
+        data.push("large data chunk ".repeat(1000));
+    }
+    data.length;
+  `, "memory-test.js")
+// errors.Is(err, v8.ErrHeapLimitReached) is true.
+```
+
 ### CPU Profiler
+
+V8 only samples the OS thread that started profiling.
+`CPUProfiler.Do` keeps the profiled function on that thread.
+When using `StartProfiling` and `StopProfiling` directly, call `runtime.LockOSThread` first, and execute JavaScript on the same goroutine.
+Otherwise, samples are silently missing from the profile.
 
 ```go
 func createProfile() {
@@ -141,16 +219,14 @@ func createProfile() {
 	ctx := v8.NewContext(iso)
 	cpuProfiler := v8.NewCPUProfiler(iso)
 
-	cpuProfiler.StartProfiling("my-profile")
+	cpuProfile := cpuProfiler.Do("my-profile", func() {
+		ctx.RunScript(profileScript, "script.js") // this script is defined in cpuprofiler_test.go
+		val, _ := ctx.Global().Get("start")
+		fn, _ := val.AsFunction()
+		fn.Call(ctx.Global())
+	})
 
-	ctx.RunScript(profileScript, "script.js") # this script is defined in cpuprofiler_test.go
-	val, _ := ctx.Global().Get("start")
-	fn, _ := val.AsFunction()
-	fn.Call(ctx.Global())
-
-	cpuProfile := cpuProfiler.StopProfiling("my-profile")
-
-	printTree("", cpuProfile.GetTopDownRoot()) # helper function to print the profile
+	printTree("", cpuProfile.GetTopDownRoot()) // helper function to print the profile
 }
 
 func printTree(nest string, node *v8.CPUProfileNode) {
@@ -181,125 +257,49 @@ func printTree(nest string, node *v8.CPUProfileNode) {
 //   (garbage collector) :0:0
 ```
 
-## Documentation
-
-Go Reference & more examples: https://pkg.go.dev/rogchap.com/v8go
-
-### Support
-
-If you would like to ask questions about this library or want to keep up-to-date with the latest changes and releases,
-please join the [**#v8go**](https://gophers.slack.com/channels/v8go) channel on Gophers Slack. [Click here to join the Gophers Slack community!](https://invite.slack.golangbridge.org/)
-
-### Windows
-
-There used to be Windows binary support. For further information see, [PR #234](https://github.com/rogchap/v8go/pull/234).
-
-The v8go library would welcome contributions from anyone able to get an external windows
-build of the V8 library linking with v8go, using the version of V8 checked out in the
-`deps/v8` git submodule, and documentation of the process involved. This process will likely
-involve passing a linker flag when building v8go (e.g. using the `CGO_LDFLAGS` environment
-variable.
-
-## V8 dependency
-
-V8 version: **9.0.257.18** (April 2021)
-
-In order to make `v8go` usable as a standard Go package, prebuilt static libraries of V8
-are included for Linux and macOS. you *should not* require to build V8 yourself.
-
-Due to security concerns of binary blobs hiding malicious code, the V8 binary is built via CI *ONLY*.
-
-## Project Goals
-
-To provide a high quality, idiomatic, Go binding to the [V8 C++ API](https://v8.github.io/api/head/index.html).
-
-The API should match the original API as closely as possible, but with an API that Gophers (Go enthusiasts) expect. For
-example: using multiple return values to return both result and error from a function, rather than throwing an
-exception.
-
-This project also aims to keep up-to-date with the latest (stable) release of V8.
-
-## License
-
-[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B22862%2Fgit%40github.com%3Arogchap%2Fv8go.git.svg?type=large)](https://app.fossa.com/projects/custom%2B22862%2Fgit%40github.com%3Arogchap%2Fv8go.git?ref=badge_large)
-
 ## Development
 
-### Recompile V8 with debug info and debug checks
+Contributors working on v8go itself build its C++ sources instead of the prebuilt bridge. V8 is built
+with Chromium's hardened libc++, so v8go must be compiled against the same headers
+(`deps/include_libcxx/`), with Clang 21 or newer. `-nostdinc++` isn't allowed in `#cgo` directives,
+so it goes in `CGO_CXXFLAGS`:
 
-[Aside from data races, Go should be memory-safe](https://research.swtch.com/gorace) and v8go should preserve this property by adding the necessary checks to return an error or panic on these unsupported code paths. Release builds of v8go don't include debugging information for the V8 library since it significantly adds to the binary size, slows down compilation and shouldn't be needed by users of v8go. However, if a v8go bug causes a crash (e.g. during new feature development) then it can be helpful to build V8 with debugging information to get a C++ backtrace with line numbers. The following steps will not only do that, but also enable V8 debug checking, which can help with catching misuse of the V8 API.
-
-1) Make sure to clone the projects submodules (ie. the V8's `depot_tools` project): `git submodule update --init --recursive`
-1) Build the V8 binary for your OS: `deps/build.py --debug`. V8 is a large project, and building the binary can take up to 30 minutes.
-1) Build the executable to debug, using `go build` for commands or `go test -c` for tests. You may need to add the `-ldflags=-compressdwarf=false` option to disable debug information compression so this information can be read by the debugger (e.g. lldb that comes with Xcode v12.5.1, the latest Xcode released at the time of writing)
-1) Run the executable with a debugger (e.g. `lldb -- ./v8go.test -test.run TestThatIsCrashing`, `run` to start execution then use `bt` to print a bracktrace after it breaks on a crash), since backtraces printed by Go or V8 don't currently include line number information.
-
-### Upgrading the V8 binaries
-
-We have the [upgradev8](https://github.com/rogchap/v8go/.github/workflow/v8upgrade.yml) workflow.
-The workflow is triggered every day or manually.
-
-If the current [v8_version](https://github.com/rogchap/v8go/deps/v8_version) is different from the latest stable version, the workflow takes care of fetching the latest stable v8 files and copying them into `deps/include`. The last step of the workflow opens a new PR with the branch name `v8_upgrade/<v8-version>` with all the changes.
-
-The next steps are:
-
-1) The build is not yet triggered automatically. To trigger it manually, go to the [V8
-Build](https://github.com/rogchap/v8go/actions?query=workflow%3A%22V8+Build%22) Github Action, Select "Run workflow",
-and select your pushed branch eg. `v8_upgrade/<v8-version>`.
-1) Once built, this should open 3 PRs against your branch to add the `libv8.a` for Linux (for x86_64) and macOS for x86_64 and arm64; merge
-these PRs into your branch. You are now ready to raise the PR against `master` with the latest version of V8.
-
-### Flushing after C/C++ standard library printing for debugging
-
-When using the C/C++ standard library functions for printing (e.g. `printf`), then the output will be buffered by default.
-This can cause some confusion, especially because the test binary (created through `go test`) does not flush the buffer
-at exit (at the time of writing). When standard output is the terminal, then it will use line buffering and flush when
-a new line is printed, otherwise (e.g. if the output is redirected to a pipe or file) it will be fully buffered and not even
-flush at the end of a line. When the test binary is executed through `go test .` (e.g. instead of
-separately compiled with `go test -c` and run with `./v8go.test`) Go may redirect standard output internally, resulting in
-standard output being fully buffered.
-
-A simple way to avoid this problem is to flush the standard output stream after printing with the `fflush(stdout);` statement.
-Not relying on the flushing at exit can also help ensure the output is printed before a crash.
-
-### Local leak checking
-
-Leak checking is automatically done in CI, but it can be useful to do locally to debug leaks.
-
-Leak checking is done using the [Leak Sanitizer](https://clang.llvm.org/docs/LeakSanitizer.html) which
-is a part of LLVM. As such, compiling with clang as the C/C++ compiler seems to produce more complete
-backtraces (unfortunately still only of the system stack at the time of writing).
-
-For instance, on a Debian-based Linux system, you can use `sudo apt-get install clang-12` to install a
-recent version of clang.  Then CC and CXX environment variables are needed to use that compiler. With
-that compiler, the tests can be run as follows
-
-```
-CC=clang-12 CXX=clang++-12 go test -c --tags leakcheck && ./v8go.test
+```sh
+CC=clang-21 CXX=clang++-21 CGO_CXXFLAGS=-nostdinc++ go test -tags v8go_source ./...
 ```
 
-The separate compile and link commands are currently needed to get line numbers in the backtrace.
+These variables apply to every cgo package of the build. On Windows:
+`CC="clang -fuse-ld=lld" CXX="clang++ -fuse-ld=lld" CGO_CXXFLAGS=-nostdinc++`.
 
-On macOS, leak checking isn't available with the version of clang that comes with Xcode, so a separate
-compiler installation is needed.  For example, with homebrew, `brew install llvm` will install a version
-of clang with support for this. The ASAN_OPTIONS environment variable will also be needed to run the code
-with leak checking enabled, since it isn't enabled by default on macOS. E.g. with the homebrew
-installation of llvm, the tests can be run with
+The Docker dev image (`tools/docker/dev.sh '<command>'`) has the toolchains (Go, clang 21, gcc,
+benchstat, LLVM binutils). After a change to the C++ sources, the prebuilt bridges must be rebuilt
+and the `deps/*` modules re-pinned: see [BOTIFY.md](BOTIFY.md). Source mode has limits (no C++
+runtime isolation), also listed there.
 
-```
-CXX=/usr/local/opt/llvm/bin/clang++ CC=/usr/local/opt/llvm/bin/clang go test -c --tags leakcheck -ldflags=-compressdwarf=false
-ASAN_OPTIONS=detect_leaks=1 ./v8go.test
-```
+### Leak checking
 
-The `-ldflags=-compressdwarf=false` is currently (with clang 13) needed to get line numbers in the backtrace.
+`go test -c -tags 'leakcheck v8go_source'` builds the tests with the
+[Leak Sanitizer](https://clang.llvm.org/docs/LeakSanitizer.html) (Linux; `botify-ci` runs it). Run
+the resulting `./v8go.test`; separate compile and run steps give line numbers in backtraces.
 
 ### Formatting
 
-Go has `go fmt`, C has `clang-format`. Any changes to the `v8go.h|cc` should be formated with `clang-format` with the
-"Chromium" Coding style. This can be done easily by running the `go generate` command.
+Go has `go fmt`; the `*.h` and `*.cc` files follow `clang-format` with the Chromium style
+(`.clang-format`, `go generate`). clang-format rewrites the `//go:build v8go_source` line of the
+`.cc` files: see the pitfall in [BOTIFY.md](BOTIFY.md) before formatting.
 
-`brew install clang-format` to install on macOS.
+### Debugging V8
 
----
+Release builds of V8 have no debug information. To get C++ backtraces with line numbers, build V8
+with debug info and checks (`deps/build.py --debug`, see tommie/v8go), build the test binary with
+`go test -c -ldflags=-compressdwarf=false`, and run it under a debugger. Output printed with C
+`printf` is buffered: `fflush(stdout)` after printing.
+
+## Credits and license
+
+v8go was created by Roger Chapman ([rogchap/v8go](https://github.com/rogchap/v8go)) and is
+maintained upstream in [tommie/v8go](https://github.com/tommie/v8go); this fork
+tracks tommie/v8go. Upstream's project goal stands: a high quality, idiomatic Go binding to the
+[V8 C++ API](https://v8.github.io/api/head/index.html). License: [LICENSE](LICENSE) (BSD 3-Clause).
 
 V8 Gopher image based on original artwork from the amazing [Renee French](http://reneefrench.blogspot.com).

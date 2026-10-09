@@ -1,0 +1,52 @@
+diff --git a/function_template.cc b/function_template.cc
+index 8cb93b7..2c13f24 100644
+--- a/function_template.cc
++++ b/function_template.cc
+@@ -15,7 +15,9 @@ using namespace v8;
+ 
+ void FunctionTemplateCallback(const FunctionCallbackInfo<Value>& info) {
+   Isolate* iso = info.GetIsolate();
+-  ISOLATE_SCOPE(iso);
++  // Botify: V8 calls this from JS, so iso is already locked and entered by
++  // this thread: a Locker and an Isolate::Scope would only cost time.
++  HandleScope handle_scope(iso);
+ 
+   // This callback function can be called from any Context, which we only know
+   // at runtime. We extract the Context reference from the embedder data so that
+@@ -36,21 +38,29 @@ void FunctionTemplateCallback(const FunctionCallbackInfo<Value>& info) {
+   _this->id = 0;
+   _this->iso = iso;
+   _this->ctx = ctx;
+-  _this->ptr.Reset(iso, Global<Value>(iso, info.This()));
+-
+-  std::vector<ValuePtr> thisAndArgs(1 + info.Length());
++  _this->ptr.Reset(iso, info.This());
++
++  // Botify: calls with few arguments need no heap allocation.
++  size_t count = 1 + info.Length();
++  ValuePtr stackArgs[8];
++  std::vector<ValuePtr> heapArgs;
++  ValuePtr* thisAndArgs = stackArgs;
++  if (count > std::size(stackArgs)) {
++    heapArgs.resize(count);
++    thisAndArgs = heapArgs.data();
++  }
+   thisAndArgs[0] = tracked_value(ctx, _this);
+-  for (size_t i = 1; i < thisAndArgs.size(); ++i) {
++  for (size_t i = 1; i < count; ++i) {
+     m_value* val = new m_value;
+     val->id = 0;
+     val->iso = iso;
+     val->ctx = ctx;
+-    val->ptr.Reset(iso, Global<Value>(iso, info[i - 1]));
++    val->ptr.Reset(iso, info[i - 1]);
+     thisAndArgs[i] = tracked_value(ctx, val);
+   }
+ 
+-  goFunctionCallback_return retval = goFunctionCallback(
+-      ctx_ref, callback_ref, thisAndArgs.data(), thisAndArgs.size() - 1);
++  goFunctionCallback_return retval =
++      goFunctionCallback(ctx_ref, callback_ref, thisAndArgs, count - 1);
+   if (retval.r1 != nullptr) {
+     iso->ThrowException(retval.r1->ptr.Get(iso));
+   } else if (retval.r0 != nullptr) {

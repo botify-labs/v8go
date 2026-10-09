@@ -1,0 +1,53 @@
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+                           │   before    │                after                │
+                           │   sec/op    │    sec/op     vs base               │
+NewContext-16                134.8µ ± 7%   134.6µ ±  3%       ~ (p=0.739 n=10)
+RunScriptTrivial-16          763.4n ± 3%   767.0n ±  5%       ~ (p=0.684 n=10)
+CallJSFromGo-16              820.9n ± 4%   802.9n ±  1%  -2.19% (p=0.001 n=10)
+CallGoFromJS1000-16          347.0µ ± 8%   349.1µ ±  6%       ~ (p=0.684 n=10)
+CallGoFromJS1000Cleanup-16   397.1µ ± 3%   401.4µ ±  8%       ~ (p=0.853 n=10)
+NewValueString-16            327.7n ± 2%   326.3n ±  3%       ~ (p=0.926 n=10)
+ValueToGoString-16           1.594µ ± 3%   1.567µ ±  4%       ~ (p=0.324 n=10)
+ObjectSetGet-16              935.8n ± 2%   936.1n ±  2%       ~ (p=0.912 n=10)
+JSONParse-16                 26.82µ ± 2%   26.94µ ± 10%       ~ (p=0.481 n=10)
+JSONStringify-16             29.34µ ± 3%   29.73µ ±  7%       ~ (p=0.105 n=10)
+geomean                      9.228µ        9.223µ        -0.05%
+
+                           │    before    │                 after                 │
+                           │     B/op     │     B/op      vs base                 │
+NewContext-16                  80.00 ± 0%     80.00 ± 0%       ~ (p=1.000 n=10) ¹
+RunScriptTrivial-16            16.00 ± 0%     16.00 ± 0%       ~ (p=1.000 n=10) ¹
+CallJSFromGo-16                68.00 ± 0%     68.00 ± 0%       ~ (p=1.000 n=10) ¹
+CallGoFromJS1000-16          127.9Ki ± 0%   127.9Ki ± 0%       ~ (p=1.000 n=10)
+CallGoFromJS1000Cleanup-16   128.0Ki ± 0%   128.0Ki ± 0%       ~ (p=1.000 n=10)
+NewValueString-16              32.00 ± 0%     32.00 ± 0%       ~ (p=1.000 n=10) ¹
+ValueToGoString-16             272.0 ± 0%     272.0 ± 0%       ~ (p=1.000 n=10) ¹
+ObjectSetGet-16                36.00 ± 0%     36.00 ± 0%       ~ (p=1.000 n=10) ¹
+JSONParse-16                   16.00 ± 0%     16.00 ± 0%       ~ (p=1.000 n=10) ¹
+JSONStringify-16             16.00Ki ± 0%   16.00Ki ± 0%       ~ (p=1.000 n=10) ¹
+geomean                        406.4          406.4       +0.00%
+¹ all samples are equal
+
+                           │    before    │                 after                 │
+                           │  allocs/op   │  allocs/op    vs base                 │
+NewContext-16                 5.000 ±  0%    5.000 ±  0%       ~ (p=1.000 n=10) ¹
+RunScriptTrivial-16           1.000 ±  0%    1.000 ±  0%       ~ (p=1.000 n=10) ¹
+CallJSFromGo-16               5.000 ±  0%    5.000 ±  0%       ~ (p=1.000 n=10) ¹
+CallGoFromJS1000-16          2.746k ±  0%   2.746k ±  0%       ~ (p=1.000 n=10) ¹
+CallGoFromJS1000Cleanup-16   2.752k ±  0%   2.752k ±  0%       ~ (p=1.000 n=10) ¹
+NewValueString-16             2.000 ±  0%    2.000 ±  0%       ~ (p=1.000 n=10) ¹
+ValueToGoString-16            2.000 ±  0%    2.000 ±  0%       ~ (p=1.000 n=10) ¹
+ObjectSetGet-16               3.000 ± 33%    3.000 ± 33%       ~ (p=1.000 n=10)
+JSONParse-16                  1.000 ±  0%    1.000 ±  0%       ~ (p=1.000 n=10) ¹
+JSONStringify-16              1.000 ±  0%    1.000 ±  0%       ~ (p=1.000 n=10) ¹
+geomean                       8.621          8.621        +0.00%
+¹ all samples are equal
+
+                 │    before    │                after                │
+                 │     B/s      │     B/s       vs base               │
+JSONParse-16       533.3Mi ± 2%   530.9Mi ± 9%       ~ (p=0.481 n=10)
+JSONStringify-16   487.6Mi ± 3%   481.2Mi ± 7%       ~ (p=0.105 n=10)
+geomean            509.9Mi        505.5Mi       -0.88%

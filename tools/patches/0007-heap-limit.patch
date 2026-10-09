@@ -1,0 +1,99 @@
+diff --git a/errors.cc b/errors.cc
+index 92b9eec..031b462 100644
+--- a/errors.cc
++++ b/errors.cc
+@@ -11,6 +11,7 @@
+ #include "deps/include/v8-message.h"
+ #include "deps/include/v8-primitive.h"
+ 
++#include "cleanup.h"
+ #include "errors.h"
+ #include "isolate.h"
+ #include "utils.h"
+@@ -89,12 +90,23 @@ RtnError ExceptionError(TryCatch& try_catch, Isolate* iso, Local<Context> ctx) {
+   RtnError rtn = {};
+ 
+   if (try_catch.HasTerminated()) {
+-    if (IsolateTakeHeapLimitReached(iso)) {
++    // Botify: V8 clears the termination when it reaches a TryCatch at call
++    // depth zero, i.e. once no JavaScript remains on the stack, and Reset
++    // does now what the TryCatch's destructor would do. Otherwise (a script
++    // run by a Go callback, itself called from JavaScript), the termination
++    // goes on through the outer script, whose error must report the heap
++    // limit too: the flag is only taken at the top level.
++    try_catch.Reset();
++    bool top_level = !iso->IsExecutionTerminating();
++    if (top_level ? IsolateTakeHeapLimitReached(iso)
++                  : IsolatePeekHeapLimitReached(iso)) {
+       // The script has unwound, so its garbage can be collected. This
+       // makes AutomaticallyRestoreInitialHeapLimit restore the limit,
+       // which it only does when the heap is small enough. Otherwise, the
+       // next script reaching the limit would raise it further.
+-      iso->LowMemoryNotification();
++      if (top_level) {
++        iso->LowMemoryNotification();
++      }
+       rtn.msg = CopyString("ExecutionTerminated: heap limit reached");
+       rtn.heap_limit_reached = 1;
+     } else {
+diff --git a/isolate.cc b/isolate.cc
+index f1296e1..3899f0f 100644
+--- a/isolate.cc
++++ b/isolate.cc
+@@ -15,6 +15,8 @@
+ #include "isolate.h"
+ #include "libplatform/libplatform.h"
+ 
++#include <atomic>
++
+ using namespace v8;
+ 
+ auto default_platform = platform::NewDefaultPlatform();
+@@ -46,9 +48,14 @@ extern "C" {
+ // Per-isolate state, in data slot 1. Slot 0 holds the internal context.
+ struct IsolateState {
+   // Set when NearMemoryLimitCallback terminates execution, and cleared
+-  // when the termination is reported.
++  // when the termination is reported (Botify: at the top level, see
++  // ExceptionError) or by Isolate.Cleanup.
+   bool heap_limit_reached = false;
+ 
++  // Botify: set with heap_limit_reached, but only cleared by Isolate.Cleanup
++  // (Isolate.HeapLimitReached). Read without the isolate's lock.
++  std::atomic<bool> heap_limit_raised{false};
++
+   // Whether errors include a serialized exception message.
+   bool exception_messages = false;
+ };
+@@ -77,6 +84,7 @@ size_t NearMemoryLimitCallback(void* data,
+   auto iso = static_cast<Isolate*>(data);
+   auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
+   state->heap_limit_reached = true;
++  state->heap_limit_raised.store(true, std::memory_order_relaxed);
+   iso->TerminateExecution();
+ 
+   // if we return the initial heap limit, the VM will crash, so here we give it
+@@ -156,6 +164,23 @@ int IsolateTakeHeapLimitReached(IsolatePtr iso) {
+   return 1;
+ }
+ 
++// Botify (cleanup.h).
++int IsolatePeekHeapLimitReached(IsolatePtr iso) {
++  auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
++  return state->heap_limit_reached;
++}
++
++int IsolateHeapLimitRaised(IsolatePtr iso) {
++  auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
++  return state->heap_limit_raised.load(std::memory_order_relaxed);
++}
++
++void IsolateResetHeapLimitReached(IsolatePtr iso) {
++  auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
++  state->heap_limit_reached = false;
++  state->heap_limit_raised.store(false, std::memory_order_relaxed);
++}
++
+ void IsolateTerminateExecution(IsolatePtr iso) {
+   iso->TerminateExecution();
+ }

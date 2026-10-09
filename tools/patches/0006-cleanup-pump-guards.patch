@@ -1,0 +1,50 @@
+diff --git a/inspector.cc b/inspector.cc
+index 4530455..6869cb9 100644
+--- a/inspector.cc
++++ b/inspector.cc
+@@ -5,6 +5,7 @@
+ #include "deps/include/v8-inspector.h"
+ 
+ #include "_cgo_export.h"
++#include "botify_context.h"
+ #include "context-macros.h"
+ #include "inspector.h"
+ 
+@@ -50,6 +51,13 @@ void InspectorClient::consoleAPIMessage(int contextGroupId,
+                                         unsigned lineNumber,
+                                         unsigned columnNumber,
+                                         V8StackTrace*) {
++  // Botify: Isolate.Cleanup runs no JS or Go code (botify_context.h).
++  // A C++ builtin such as console.log, called directly by a task it runs
++  // (e.g. as a FinalizationRegistry callback), isn't stopped by the
++  // termination it requests.
++  if (BotifyInCleanup(Isolate::GetCurrent())) {
++    return;
++  }
+   goHandleConsoleAPIMessageCallback(
+       _cgoHandle, contextGroupId, level, ConvertStringView(message),
+       ConvertStringView(url), lineNumber, columnNumber);
+diff --git a/isolate.cc b/isolate.cc
+index 1c2c0b9..f1296e1 100644
+--- a/isolate.cc
++++ b/isolate.cc
+@@ -10,6 +10,7 @@
+ #include "deps/include/v8-promise.h"
+ 
+ #include "_cgo_export.h"
++#include "botify_context.h"
+ #include "context.h"
+ #include "isolate.h"
+ #include "libplatform/libplatform.h"
+@@ -184,6 +185,11 @@ static_assert(kPromiseHandlerAddedAfterReject == 1);
+ 
+ static void PromiseRejectedCallback(PromiseRejectMessage message) {
+   Isolate* iso = Isolate::GetCurrent();
++  // Botify: Isolate.Cleanup runs no JS or Go code (botify_context.h).
++  // The tasks it runs reject promises (e.g. a failed wasm compilation).
++  if (BotifyInCleanup(iso)) {
++    return;
++  }
+   Local<Promise> promise = message.GetPromise();
+ 
+   Local<Context> local_ctx;

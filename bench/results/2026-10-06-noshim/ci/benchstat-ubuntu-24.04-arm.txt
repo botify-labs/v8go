@@ -1,0 +1,95 @@
+goos: linux
+goarch: arm64
+pkg: github.com/botify-labs/v8go/bench
+                             │ bench-ubuntu-24.04-arm/new.txt │
+                             │             sec/op             │
+NewIsolate-4                                     1.420m ±  1%
+NewContext-4                                     261.6µ ±  1%
+RunScriptTrivial-4                               1.634µ ±  1%
+CallJSFromGo-4                                   1.844µ ±  1%
+CallGoFromJS1000-4                               1.293m ±  4%
+NewValueString-4                                 704.6n ±  1%
+ValueToGoString-4                                3.178µ ±  1%
+ObjectSetGet-4                                   2.029µ ±  1%
+JSONParse-4                                      64.14µ ±  0%
+JSONStringify-4                                  57.32µ ±  0%
+Cleanup1000Values-4                              46.76µ ±  6%
+CompileLodashCold-4                              3.677m ±  0%
+CompileLodashWithCodeCache-4                     592.5µ ±  1%
+StartupWithLodash-4                              6.925m ±  2%
+JSRegex-4                                        91.83µ ± 21%
+JSObjects-4                                      333.9µ ±  2%
+JSArrays-4                                       7.356m ±  1%
+JSStrings-4                                      723.2µ ±  1%
+JSJSON-4                                         1.278m ±  0%
+HeapPerIsolate-4                                 1.817m ±  1%
+HeapPerContext-4                                 14.70m ±  0%
+geomean                                          172.6µ
+
+                             │ bench-ubuntu-24.04-arm/new.txt │
+                             │              B/op              │
+NewIsolate-4                                     176.0 ± 0%
+NewContext-4                                     80.00 ± 0%
+RunScriptTrivial-4                               16.00 ± 0%
+CallJSFromGo-4                                   68.00 ± 0%
+CallGoFromJS1000-4                             135.7Ki ± 0%
+NewValueString-4                                 32.00 ± 0%
+ValueToGoString-4                                272.0 ± 0%
+ObjectSetGet-4                                   36.00 ± 0%
+JSONParse-4                                      16.00 ± 0%
+JSONStringify-4                                16.00Ki ± 0%
+Cleanup1000Values-4                              0.000 ± 0%
+CompileLodashCold-4                            3.310Ki ± 0%
+CompileLodashWithCodeCache-4                     16.00 ± 0%
+StartupWithLodash-4                              304.0 ± 0%
+JSRegex-4                                        16.00 ± 0%
+JSObjects-4                                      16.00 ± 0%
+JSArrays-4                                       16.00 ± 0%
+JSStrings-4                                      16.00 ± 0%
+JSJSON-4                                         16.00 ± 0%
+HeapPerIsolate-4                                 272.0 ± 0%
+HeapPerContext-4                               4.859Ki ± 0%
+geomean                                                     ¹
+¹ summaries must be >0 to compute geomean
+
+                             │ bench-ubuntu-24.04-arm/new.txt │
+                             │           allocs/op            │
+NewIsolate-4                                     5.000 ± 0%
+NewContext-4                                     5.000 ± 0%
+RunScriptTrivial-4                               1.000 ± 0%
+CallJSFromGo-4                                   4.000 ± 0%
+CallGoFromJS1000-4                              7.746k ± 0%
+NewValueString-4                                 2.000 ± 0%
+ValueToGoString-4                                2.000 ± 0%
+ObjectSetGet-4                                   2.000 ± 0%
+JSONParse-4                                      1.000 ± 0%
+JSONStringify-4                                  1.000 ± 0%
+Cleanup1000Values-4                              0.000 ± 0%
+CompileLodashCold-4                              1.000 ± 0%
+CompileLodashWithCodeCache-4                     1.000 ± 0%
+StartupWithLodash-4                              13.00 ± 0%
+JSRegex-4                                        1.000 ± 0%
+JSObjects-4                                      1.000 ± 0%
+JSArrays-4                                       1.000 ± 0%
+JSStrings-4                                      1.000 ± 0%
+JSJSON-4                                         1.000 ± 0%
+HeapPerIsolate-4                                 11.00 ± 0%
+HeapPerContext-4                                 305.0 ± 0%
+geomean                                                     ¹
+¹ summaries must be >0 to compute geomean
+
+                             │ bench-ubuntu-24.04-arm/new.txt │
+                             │              B/s               │
+JSONParse-4                                      223.0Mi ± 0%
+JSONStringify-4                                  249.6Mi ± 0%
+CompileLodashCold-4                              141.1Mi ± 0%
+CompileLodashWithCodeCache-4                     875.8Mi ± 1%
+geomean                                          288.0Mi
+
+                 │ bench-ubuntu-24.04-arm/new.txt │
+                 │           heapB/iso            │
+HeapPerIsolate-4                      191.4k ± 0%
+
+                 │ bench-ubuntu-24.04-arm/new.txt │
+                 │           heapB/ctx            │
+HeapPerContext-4                      88.31k ± 0%

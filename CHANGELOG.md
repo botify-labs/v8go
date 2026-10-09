@@ -4,7 +4,314 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+This file is Botify-owned (`tools/botify-owned.txt`): `tools/sync_tommie.sh` doesn't overwrite it.
+The Botify releases of `github.com/botify-labs/v8go` come first. Below them, from
+"tommie/v8go history" on, is tommie/v8go's changelog as of the imported snapshot
+(`deps/tommie_sha`); its version numbers are tommie's tags, not this module's (tommie's v0.10.0 of
+2023-12-29 is unrelated to Botify's v0.10.0). Copy new upstream entries by hand when syncing.
+For consumers of the old Botify fork (`rogchap.com/v8go`, V8 9.0), [MIGRATION.md](MIGRATION.md)
+lists every change in detail.
+
+## Botify releases
+
+### [v0.10.0] - unreleased
+
+First release of the module `github.com/botify-labs/v8go`, replacing the Botify fork of
+`rogchap.com/v8go` at 6f9829d (V8 9.0).
+
+#### Changed
+- Based on tommie/v8go 0ffc991 (V8 15.4.80.20, tommie's unreleased changes after v0.37.0 included),
+  renamed to `github.com/botify-labs/v8go`. Platforms: linux amd64/arm64, darwin amd64/arm64,
+  windows amd64 (MSVC-target clang with LLD, Go 1.27 or newer). Android is dropped.
+- The C++ bridge ships prebuilt in the `deps/<os>_<arch>` modules: consumers need no C++ toolchain
+  and no `CGO_CXXFLAGS` on Linux and macOS. Building the C++ sources takes `-tags v8go_source`.
+- Reaching the heap limit terminates the script with `ErrHeapLimitReached` instead of aborting the
+  process.
+- Intl is enabled (the old fork was built without i18n): locale-sensitive output depends on the host
+  unless `SetDefaultLocale` is called.
+- Linux glibc: V8 needs 2.31 or newer; CI checks binaries linked on glibc 2.34 need at most
+  `GLIBC_2.34`.
+
+#### Added
+- `Isolate.Cleanup` and `Context.Cleanup`, carried over from the old fork. `Isolate.Cleanup` also runs
+  V8's pending tasks (GC, and those that settle promises: wasm compilations, `Atomics.waitAsync`); it
+  never runs JavaScript or Go callbacks (function callbacks, `PromiseRejectedCallback`, inspector
+  console messages), drops the promise reactions still pending, cancels a termination requested
+  while it runs, and clears the heap limit state. Both do nothing when called with JavaScript on the
+  calling thread's stack, and need exclusive use of the isolate.
+- `Isolate.HeapLimitReached`: whether the heap limit was reached since the last `Isolate.Cleanup`,
+  including when no error reported it (in a promise reaction, while compiling, in a GC).
+- `SetDefaultLocale`, to pin the default locale of V8's ICU process-wide.
+
+#### Fixed
+- V8's C++ runtime (Chromium's libc++abi/libc++ ABI layer) no longer clashes with g++/libstdc++ code
+  on Linux: it is renamed in the Linux archives, so fully static binaries link and exceptions thrown
+  in libstdc++ no longer end in `std::terminate`.
+- PartitionAlloc's allocator shim is removed from V8's archives: the process keeps the system
+  `malloc`.
+- Calling a function of a closed `Context` throws `Error: v8go: context closed` instead of crashing.
+- A Go callback returning the error of a terminated nested script keeps the termination going,
+  instead of turning it into a catchable exception. When a nested script reaches the heap limit, the
+  outer script's error matches `ErrHeapLimitReached` too.
+- A termination (`TerminateExecution`, heap limit) terminates the whole run again, as with V8 9.0:
+  V8 15.4 cleared it on entry to most API calls, so that a Go callback making any V8 call after a
+  terminated nested script, or after a JavaScript `toString` that `Value.String` called was
+  terminated, cancelled it and the outer script went on running. The JavaScript such later calls
+  run is terminated at its first instruction, and the callback's caller unwinds as soon as the
+  callback returns.
+- A `TerminateExecution` requested while no script runs terminates the next run (`RunScript`,
+  `UnboundScript.Run`, `Function.Call`, `Function.NewInstance`, `PerformMicrotaskCheckpoint`) on
+  whatever OS thread it runs: V8 kept it with one thread's state, so a run on another thread missed
+  it, and a later run of the first thread was terminated instead.
+- `Value.Int32`, `Integer`, `Number`, `Uint32`, `Object.Has`, `Object.Delete` and
+  `PromiseResolver.Resolve`/`Reject` return a zero value (`0`, `false`) instead of aborting the process
+  when the JavaScript they run (`valueOf`, a getter, a proxy trap) throws or is terminated.
+- A heap limit reached by a garbage collection during `Isolate.Cleanup` stays visible to
+  `HeapLimitReached` after it.
+- A heap limit reached without a reported termination (in a promise reaction run after the script's
+  result, for instance) no longer makes a later `TerminateExecution` report `ErrHeapLimitReached`
+  once `Isolate.Cleanup` has run.
+- JS→Go calls are faster (about −57% on bursts of calls, see `bench/results/2026-10-07-final/`).
+
+## tommie/v8go history
+
 ## [Unreleased]
+
+### Added
+- Add Windows amd64 support, requiring Go 1.27 and LLVM's MSVC-target clang with LLD. See the README for details. In [#121](https://github.com/tommie/v8go/issues/121).
+- Add `CPUProfiler.Do` to profile a function. It keeps the function on the OS thread V8 samples.
+- Add `Isolate.SetPromiseRejectedCallback` to be notified of unhandled promise rejections, and of rejection handlers added after the fact. Based on [#108](https://github.com/tommie/v8go/pull/108).
+- `NewValue` wraps Go pointers in V8 Externals, read back with `Value.External`, e.g. to wrap Go objects in JavaScript objects. The Go value is released when V8 garbage collects the External, or the Isolate is disposed. In [#107](https://github.com/tommie/v8go/pull/107).
+
+### Changed
+- Document that `CPUProfiler.StartProfiling` requires JavaScript to execute on the calling OS thread. V8 only samples that thread, so the profile silently missed samples when Go moved the goroutine to another thread.
+
+### Fixed
+- `CPUProfile.GetDuration` was 1000 times too long, since V8's microseconds were read as milliseconds.
+- `go mod vendor` copies the V8 and libc++ header files, so vendored builds work again. In [#116](https://github.com/tommie/v8go/issues/116).
+
+## [v0.37.0] - 2026-10-02
+
+### Changed
+- Auto-bumped V8 to 15.4.80.20.
+
+## [v0.36.0] - 2026-10-01
+
+### Added
+- Add `Isolate.WriteHeapSnapshot` to write a heap snapshot for Chrome DevTools, and `Isolate.LowMemoryNotification`, based on [#110](https://github.com/tommie/v8go/pull/110).
+- Add `ErrHeapLimitReached`, matched by `errors.Is` when execution was terminated because the isolate reached its heap limit.
+- Add `WithExceptionMessages` and `JSError.ExceptionMessage`, returning the exception's script, line, columns, source line, and stack frames.
+
+### Changed
+- Pin depot_tools in V8 builds, upgrading it together with V8, instead of self-updating it during builds.
+- Link Clang's compiler-rt builtins on Linux, instead of relying on libgcc from GCC 12 or newer.
+- The error message when the heap limit is reached is now `ExecutionTerminated: heap limit reached`.
+- Building requires Clang 21 or newer, and `CGO_CXXFLAGS=-nostdinc++`, since V8 and v8go use Chromium's libc++. See the README. This already applied to v0.35.0.
+
+### Fixed
+- Linux libraries can be linked with glibc older than 2.38, e.g. on Debian 12, Ubuntu 22.04 and RHEL 9. V8 is now built against Chromium's Debian bullseye sysroot, making glibc 2.31 the minimum.
+- Restore the heap limit after reaching it terminated execution. It was doubled on every termination, so a reused isolate's limit grew without bound.
+
+## [v0.35.0] - 2026-09-30
+
+### Changed
+- Auto-bumped V8 to 15.4.80.19.
+
+## [v0.34.0] - 2025-10-07
+
+### Added
+
+- Add support for ObjectTemplate.MarkAsUndetectable.
+- Add `Value.StrictEquals` providing strict equality checks in Go code.
+- Add resource constraint options to `NewIsolate` in [#111](https://github.com/tommie/v8go/pull/111).
+- Add support for `Value.TypeOf()` corresponding to JavaScript `typeof` operator in [#104](https://github.com/tommie/v8go/pull/104).
+
+### Changed
+
+## [v0.33.0] - 2025-05-15
+
+### Added
+- Add support for `FunctionTemplate.Inherit` to set up prototype inheritance.
+
+### Changed
+- Auto-bumped V8 to 13.6.233.10.
+
+## [v0.32.0] - 2025-04-30
+
+### Changed
+- Auto-bumped V8 to 13.6.233.8.
+
+## [v0.31.0] - 2025-04-02
+
+### Changed
+- Auto-bumped V8 to 13.5.212.10.
+
+## [v0.30.0] - 2025-02-26
+
+### Changed
+- Auto-bumped V8 to 13.3.415.23.
+
+## [v0.29.0] - 2025-02-19
+
+### Added
+
+- Add support to setup an `Inspector`, and `InspectorClient` to receive output from `console` messages in JS code.
+- Add `FunctionTemplate.InstanceTemplate` to add own properties to instances when the function is used as a constructor.
+- Add `FunctionTemplate.PrototypeTemplates` to add own properties to the prototype of an instance when the function is used as a constructor.
+
+### Changed
+- Auto-bumped V8 to 13.3.415.22.
+
+## [v0.28.0] - 2025-01-08
+
+### Changed
+- Auto-bumped V8 to 13.1.201.22.
+
+## [v0.27.0] - 2024-12-19
+
+### Changed
+- Auto-bumped V8 to 13.1.201.19.
+
+## [v0.26.0] - 2024-12-11
+
+### Changed
+- Auto-bumped V8 to 13.1.201.16.
+
+## [v0.25.0] - 2024-12-04
+
+### Changed
+- Auto-bumped V8 to 13.1.201.15.
+
+## [v0.24.0] - 2024-11-20
+
+### Changed
+- Auto-bumped V8 to 13.1.201.9.
+
+## [v0.23.0] - 2024-11-13
+
+### Changed
+- Auto-bumped V8 to 13.1.201.8.
+
+## [v0.22.0] - 2024-10-16
+
+### Changed
+- Auto-bumped V8 to 13.0.245.16.
+
+## [v0.21.0] - 2024-10-09
+
+### Changed
+- Auto-bumped V8 to 12.9.202.27.
+
+## [v0.20.0] - 2024-10-02
+
+### Changed
+- Auto-bumped V8 to 12.9.202.24.
+
+## [v0.19.0] - 2024-09-25
+
+### Changed
+- Auto-bumped V8 to 12.9.202.22.
+
+## [v0.18.0] - 2024-09-18
+
+### Changed
+- Auto-bumped V8 to 12.9.202.18.
+
+## [v0.17.0] - 2024-08-07
+
+### Changed
+
+## [v0.16.0] - 2024-08-07
+
+### Changed
+- Auto-bumped V8 to 12.7.224.18.
+
+## [v0.15.0] - 2024-07-25
+
+### Changed
+- Auto-bumped V8 to 12.7.224.16.
+
+## [v0.14.0] - 2024-07-17
+
+### Changed
+- Auto-bumped V8 to 12.6.228.28.
+
+## [v0.13.1] - 2024-06-28
+
+### Added
+- Made scheduled V8 rebuilding and releases fully automatic.
+
+### Changed
+
+### Fixed
+- The build broke because CopyablePersistentTraits was removed in V8 4683daaf774982b1aa0e46ae38f2bdf9c995c90d.
+- Removed bad release 0.13.0.
+
+## [v0.13.0] - 2024-06-28
+
+### Changed
+- Auto-bumped V8 to 12.6.228.21.
+
+## [v0.12.0] - 2024-05-01
+
+### Changed
+- Auto-bumped V8 to c546005d65b58039ccaf3f81be3772eee45454f9.
+- The build workflows commit directly, instead of creating PRs.
+
+### Fixed
+- Release tags need to include the patch number.
+  Thank you for the report, @GraphR00t.
+  (https://github.com/tommie/v8go/issues/62)
+
+## [v0.11] - 2024-03-02
+
+### Changed
+- Bumped V8 to d5c51572dec5b2a385b57549fe195c319f1284e2.
+
+## [v0.10.1] - 2023-12-30
+
+### Changed
+- Required Go version changed to 1.19 for CGo across modules.
+
+### Fixed
+- Split the built libraries into separate submodules to work around Go's 500 MB module size limit.
+- The library modules still had the old x86_64 names.
+
+## [v0.10.0] - 2023-12-29
+
+### Changed
+- Required Go version changed to 1.17 (needed for SharedArrayBuffer support)
+- Forked from rogchap.com/v8go
+- x86_64 is now referred to as amd64 in V8 builds, conforming to `GOARCH`
+
+### Added
+- Support for getting the underlying data (as a `[]byte`) from a SharedArrayBuffer
+- Support for `Symbol`
+- Support for `FunctionCallback` to return an error
+- Support for exceptions as Go errors
+- Support for Android on amd64 and arm64
+
+### Fixed
+- Upgrade to V8 12.0.267.10
+
+
+## [v0.9.0] - 2023-03-30
+
+### Fixed
+- Upgrade to V8 11.1.277.13
+
+## [v0.8.0] - 2023-01-19
+
+### Added
+- Added support for Value.release() and FunctionCallbackInfo.release(). This is useful when using v8go in a long-running context.
+
+### Fixed
+- Use string length to ensure null character-containing strings in Go/JS are not terminated early.
+- Object.Set with an empty key string is now supported
+- Upgrade to V8 10.9.194.9
+- Upgrade V8 build OS to Ubuntu 22.04
+
+## [v0.7.0] - 2021-12-09
 
 ### Added
 - Support for calling constructors functions with NewInstance on Function
@@ -21,14 +328,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for creating a code cache from an UnboundScript which can be used to create an UnboundScript in other isolates
 to run a pre-compiled script in new contexts.
 - Included compile error location in `%+v` formatting of JSError
+- Enable i18n support
 
 ### Changed
 - Removed error return value from NewIsolate which never fails
 - Removed error return value from NewContext which never fails
 - Removed error return value from Context.Isolate() which never fails
 - Removed error return value from NewObjectTemplate and NewFunctionTemplate. Panic if given a nil argument.
-- Function Call accepts receiver as first argument.
+- Function Call accepts receiver as first argument. This **subtle breaking change** will compile old code but interpret the first argument as the receiver. Use `Undefined` to prepend an argument to fix old Call use.
 - Removed Windows support until its build issues are addressed.
+- Upgrade to V8 9.6.180.12
 
 ### Fixed
 - Add some missing error propagation
