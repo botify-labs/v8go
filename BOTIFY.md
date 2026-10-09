@@ -24,10 +24,10 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   `FunctionCallback`) ; depuis une autre goroutine, ils attendent le `Locker`. Le RSS d'un isolate
   long-lived ne plafonne que grâce au timer du memory reducer de V8 (≥ 8 s) : un soak
   (`bench/soak_test.go`) doit durer assez longtemps pour qu'il se déclenche. Le job `soak` de
-  botify-ci en lance 30 000 itérations (environ 9 s sur ubuntu-24.04) et vérifie une croissance du RSS
-  ≤ 5 % sur la seconde moitié et un nombre de goroutines stable : c'est à peine plus que le délai du
-  timer. La valeur par défaut, 100 000 itérations (~20 s), n'est lancée qu'à la main
-  (`bench/run.sh soak`).
+  botify-ci le fait tourner 25 s (`SOAK_DURATION=25s`, une durée plutôt qu'un nombre d'itérations : 30 000
+  itérations ne duraient que 6,8 s sur un runner rapide, avant le timer) et vérifie une croissance
+  du RSS ≤ 5 % sur la seconde moitié et un nombre de goroutines stable. Sans `SOAK_DURATION`, le soak
+  fait `SOAK_ITERATIONS` itérations (100 000 par défaut, ~20 s ; `bench/run.sh soak`).
 - **Allocator shim retiré** : les libs V8 de tommie embarquent l'*allocator shim* de PartitionAlloc,
   qui remplacerait `malloc`/`free`/`new`/`delete` pour tout le processus consommateur (+16 à +40 %
   sur les appels unitaires, `bench/results/2026-10-06-noshim/summary.md`). `tools/sync_tommie.sh` retire ses membres des archives V8

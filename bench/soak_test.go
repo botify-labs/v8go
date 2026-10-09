@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func rssBytes(tb testing.TB) uint64 {
@@ -45,15 +46,32 @@ func soakIterations() int {
 	return 100000
 }
 
+// soakDuration is the minimum length of the run (SOAK_DURATION, a Go
+// duration such as 25s). When set, it replaces SOAK_ITERATIONS: the run lasts
+// that long whatever the machine's speed, so V8's memory reducer fires.
+func soakDuration(tb testing.TB) time.Duration {
+	s := os.Getenv("SOAK_DURATION")
+	if s == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d < 10*time.Second {
+		tb.Fatalf("SOAK_DURATION=%q: want a duration of at least 10s", s)
+	}
+	return d
+}
+
 // One long-lived isolate/context, reused across runs: run scripts, call Go
 // from JS, wrap Go values, compile from a code cache, then Cleanup.
 //
 // With the new V8, RSS only plateaus because Isolate.Cleanup runs V8's memory
 // reducer, a timer task (>= 8 s): the run must last long enough for it to fire
 // (100k iterations take ~20 s). Without it, V8's first major GC comes only
-// after ~170k iterations.
+// after ~170k iterations. A fixed iteration count lasts less than that on a
+// fast machine: CI sets SOAK_DURATION instead.
 func TestSoakCleanup(t *testing.T) {
-	iters := soakIterations()
+	iters, minDuration := soakIterations(), soakDuration(t)
+	start := time.Now()
 	iso := NewIsolate()
 	defer iso.Dispose()
 	ctx := NewContextWithFuncs(iso, map[string]func(*FunctionCallbackInfo) *Value{
@@ -76,7 +94,14 @@ func TestSoakCleanup(t *testing.T) {
 
 	var rss, heap, goHeap []uint64
 	var ms runtime.MemStats
-	for i := 0; i < iters; i++ {
+	for i := 0; ; i++ {
+		if minDuration > 0 {
+			if i%1000 == 0 && i >= 4000 && time.Since(start) >= minDuration {
+				break
+			}
+		} else if i >= iters {
+			break
+		}
 		us, err := iso.CompileUnboundScript(script, "soak.js", CompileOptions{CachedData: cache})
 		if err != nil {
 			t.Fatal(err)
@@ -115,8 +140,8 @@ func TestSoakCleanup(t *testing.T) {
 	}
 
 	g := growthSecondHalf(rss)
-	t.Logf("%s: RSS %d -> %d MiB, second-half growth %.2f%%, V8 heap last %d KiB, Go heap last %d KiB",
-		Version, rss[0]>>20, rss[len(rss)-1]>>20, g*100, heap[len(heap)-1]>>10, goHeap[len(goHeap)-1]>>10)
+	t.Logf("%s: %d iterations in %s, RSS %d -> %d MiB, second-half growth %.2f%%, V8 heap last %d KiB, Go heap last %d KiB",
+		Version, len(rss)*1000, time.Since(start).Round(time.Second), rss[0]>>20, rss[len(rss)-1]>>20, g*100, heap[len(heap)-1]>>10, goHeap[len(goHeap)-1]>>10)
 	if g > 0.05 {
 		t.Errorf("RSS grew %.2f%% over the second half (limit 5%%): leak", g*100)
 	}
