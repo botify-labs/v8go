@@ -8,13 +8,13 @@ This file is Botify-owned (`tools/botify-owned.txt`): `tools/sync_tommie.sh` doe
 The Botify releases of `github.com/botify-labs/v8go` come first. Below them, from
 "tommie/v8go history" on, is tommie/v8go's changelog as of the imported snapshot
 (`deps/tommie_sha`); its version numbers are tommie's tags, not this module's (tommie's v0.10.0 of
-2023-12-29 is unrelated to Botify's v0.10.0). Copy new upstream entries by hand when syncing.
+2023-12-29, for instance, is unrelated to this module). Copy new upstream entries by hand when syncing.
 For consumers of the old Botify fork (`rogchap.com/v8go`, V8 9.0), [MIGRATION.md](MIGRATION.md)
 lists every change in detail.
 
 ## Botify releases
 
-### [v0.10.0] - unreleased
+### [v0.15.4] - 2026-10-09
 
 First release of the module `github.com/botify-labs/v8go`, replacing the Botify fork of
 `rogchap.com/v8go` at 6f9829d (V8 9.0).

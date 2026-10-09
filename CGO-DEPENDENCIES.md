@@ -81,7 +81,7 @@ g++ liée avec V8 en `-static`) :
 
 **Isolation du runtime C++ de V8** (modules `deps/linux_*` publiés à partir du
 2026-10-07, donc dans toutes les versions que le `go.mod` de v8go épingle
-depuis, `v0.10.0` à la publication) : dans les archives Linux (`libv8-*.a`, `libc++-cr.a`,
+depuis, dont `v0.15.4`) : dans les archives Linux (`libv8-*.a`, `libc++-cr.a`,
 `libc++abi-cr.a`, le bridge `libv8go.a`), tous ces symboles sont **renommés**, définitions et
 références, avec le suffixe `.v8cr` (`objcopy --redefine-syms`) :
 
