@@ -33,7 +33,7 @@ type Promise struct {
 	*Object
 }
 
-// MewPromiseResolver creates a new Promise resolver for the given context.
+// NewPromiseResolver creates a new Promise resolver for the given context.
 // The associated Promise will be in a Pending state.
 func NewPromiseResolver(ctx *Context) (*PromiseResolver, error) {
 	if ctx == nil {
@@ -93,7 +93,24 @@ func (p *Promise) Result() *Value {
 // V8 only invokes the callback when processing "microtasks".
 // The default MicrotaskPolicy processes them when the call depth decreases to 0.
 // Call (*Context).PerformMicrotaskCheckpoint to trigger it manually.
+//
+// Botify: like a FunctionTemplate's, each callback is kept by the Isolate
+// until Isolate.Dispose, also once the promise is settled or collected: on a
+// long-lived Isolate, every Then or Catch call keeps its Go callbacks (and
+// whatever they reference) for the Isolate's lifetime.
 func (p *Promise) Then(cbs ...FunctionCallback) *Promise {
+	cbwes := make([]FunctionCallbackWithError, len(cbs))
+	for i, cb := range cbs {
+		cb := cb
+		cbwes[i] = func(info *FunctionCallbackInfo) (*Value, error) {
+			return cb(info), nil
+		}
+	}
+
+	return p.ThenWithError(cbwes...)
+}
+
+func (p *Promise) ThenWithError(cbs ...FunctionCallbackWithError) *Promise {
 	var rtn C.RtnValue
 	switch len(cbs) {
 	case 1:
@@ -117,6 +134,12 @@ func (p *Promise) Then(cbs ...FunctionCallback) *Promise {
 // Catch invokes the given function if the promise is rejected.
 // See Then for other details.
 func (p *Promise) Catch(cb FunctionCallback) *Promise {
+	return p.CatchWithError(func(info *FunctionCallbackInfo) (*Value, error) {
+		return cb(info), nil
+	})
+}
+
+func (p *Promise) CatchWithError(cb FunctionCallbackWithError) *Promise {
 	cbID := p.ctx.iso.registerCallback(cb)
 	rtn := C.PromiseCatch(p.ptr, C.int(cbID))
 	obj, err := objectResult(p.ctx, rtn)

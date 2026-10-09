@@ -1,0 +1,15 @@
+diff --git a/isolate.cc b/isolate.cc
+index 00f21af..e518992 100644
+--- a/isolate.cc
++++ b/isolate.cc
+@@ -185,6 +185,10 @@ int IsolateHeapLimitRaised(IsolatePtr iso) {
+ void IsolateResetHeapLimitReached(IsolatePtr iso) {
+   auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
+   state->heap_limit_reached = false;
++}
++
++void IsolateResetHeapLimitRaised(IsolatePtr iso) {
++  auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
+   state->heap_limit_raised.store(false, std::memory_order_relaxed);
+ }
+ 

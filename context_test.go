@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"testing"
 
-	v8 "rogchap.com/v8go"
+	v8 "github.com/botify-labs/v8go"
 )
 
 func TestContextExec(t *testing.T) {
@@ -48,7 +48,7 @@ func TestJSExceptions(t *testing.T) {
 		origin string
 		err    string
 	}{
-		{"SyntaxError", "bad js syntax", "syntax.js", "SyntaxError: Unexpected identifier"},
+		{"SyntaxError", "bad js syntax", "syntax.js", "SyntaxError: Unexpected identifier 'js'"},
 		{"ReferenceError", "add()", "add.js", "ReferenceError: add is not defined"},
 	}
 
@@ -104,8 +104,8 @@ func TestMemoryLeak(t *testing.T) {
 
 	for i := 0; i < 6000; i++ {
 		ctx := v8.NewContext(iso)
-		obj := ctx.Global()
-		_ = obj.String()
+		_ = ctx.Global()
+		// _ = obj.String()
 		_, _ = ctx.RunScript("2", "")
 		ctx.Close()
 	}

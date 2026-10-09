@@ -1,0 +1,50 @@
+diff --git a/context.cc b/context.cc
+index 5a3e41c..453117c 100644
+--- a/context.cc
++++ b/context.cc
+@@ -47,8 +47,7 @@ void ContextFree(ContextPtr ctx) {
+   }
+   ctx->ptr.Reset();
+ 
+-  for (auto it = ctx->vals.begin(); it != ctx->vals.end(); ++it) {
+-    auto value = it->second;
++  for (m_value* value : ctx->vals) {
+     value->ptr.Reset();
+     if (value->go_handle != 0) {
+       goDeleteHandle(value->go_handle);
+@@ -79,8 +78,7 @@ m_value* tracked_value(m_ctx* ctx, m_value* val) {
+   // closed (either manually or GC'd by Go) we can also release all the
+   // values associated with the context;
+   if (val->id == 0) {
+-    val->id = ++ctx->nextValId;
+-    ctx->vals[val->id] = val;
++    ctx->vals.add(val);
+   }
+ 
+   return val;
+diff --git a/context.h b/context.h
+index 63fe68c..81144b5 100644
+--- a/context.h
++++ b/context.h
+@@ -8,8 +8,8 @@
+ 
+ #include "deps/include/v8-persistent-handle.h"
+ 
+-#include <unordered_map>
+ #include <vector>
++#include "botify_values.h"
+ #include "value.h"
+ 
+ namespace v8 {
+@@ -32,10 +32,9 @@ enum ContextDataIndex {
+ 
+ struct m_ctx {
+   v8::Isolate* iso;
+-  std::unordered_map<long, m_value*> vals;
++  ValueTracker vals;
+   std::vector<m_unboundScript*> unboundScripts;
+   v8::Persistent<v8::Context> ptr;
+-  long nextValId = 0;
+ };
+ typedef m_ctx* ContextPtr;
+ 

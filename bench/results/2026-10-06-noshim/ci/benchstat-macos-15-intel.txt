@@ -1,0 +1,98 @@
+goos: darwin
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz
+                             │   baseline    │                   new                   │
+                             │    sec/op     │     sec/op      vs base                 │
+NewIsolate-4                    3.655m ±  4%    1.873m ±   5%   -48.76% (p=0.000 n=10)
+NewContext-4                    787.7µ ± 26%    512.1µ ±   7%   -34.99% (p=0.000 n=10)
+RunScriptTrivial-4              4.837µ ± 15%    2.623µ ±   6%   -45.77% (p=0.000 n=10)
+CallJSFromGo-4                  3.652µ ±  7%    2.807µ ±   4%   -23.14% (p=0.000 n=10)
+CallGoFromJS1000-4              1.552m ± 17%    1.560m ±   7%         ~ (p=0.684 n=10)
+NewValueString-4                1.499µ ±  4%    1.168µ ±  11%   -22.11% (p=0.000 n=10)
+ValueToGoString-4               6.662µ ± 18%    6.043µ ±   6%    -9.29% (p=0.001 n=10)
+ObjectSetGet-4                  4.760µ ±  7%    3.473µ ±   6%   -27.04% (p=0.000 n=10)
+JSONParse-4                     381.6µ ± 33%    142.7µ ±  13%   -62.60% (p=0.000 n=10)
+JSONStringify-4                172.68µ ± 26%    84.32µ ±   6%   -51.17% (p=0.000 n=10)
+Cleanup1000Values-4             69.03µ ± 23%   152.97µ ±  16%  +121.59% (p=0.000 n=10)
+CompileLodashCold-4             6.071m ±  6%    8.210m ±  18%   +35.23% (p=0.000 n=10)
+CompileLodashWithCodeCache-4    1.151m ±  5%    1.504m ±   5%   +30.62% (p=0.000 n=10)
+StartupWithLodash-4             14.69m ± 36%    13.51m ±   8%         ~ (p=0.353 n=10)
+JSRegex-4                       217.1µ ± 56%    175.3µ ±  14%   -19.26% (p=0.001 n=10)
+JSObjects-4                     496.3µ ±  9%    768.7µ ± 181%   +54.86% (p=0.000 n=10)
+JSArrays-4                      14.35m ± 10%    12.95m ±   6%    -9.80% (p=0.000 n=10)
+JSStrings-4                     2.142m ± 36%    1.932m ±  15%         ~ (p=0.218 n=10)
+JSJSON-4                        3.003m ±  5%    3.170m ±   8%    +5.55% (p=0.003 n=10)
+HeapPerIsolate-4                3.277m ±  8%    3.479m ±   7%    +6.17% (p=0.007 n=10)
+HeapPerContext-4                28.01m ±  4%    37.67m ±  16%   +34.47% (p=0.000 n=10)
+geomean                         381.2µ          336.4µ          -11.75%
+
+                             │    baseline    │                   new                   │
+                             │      B/op      │     B/op       vs base                  │
+NewIsolate-4                     144.0 ± 0%       176.0 ±  0%  +22.22% (p=0.000 n=10)
+NewContext-4                     80.00 ± 0%       80.00 ±  0%        ~ (p=1.000 n=10) ¹
+RunScriptTrivial-4               16.00 ± 0%       16.00 ±  0%        ~ (p=1.000 n=10) ¹
+CallJSFromGo-4                   68.00 ± 0%       68.00 ±  0%        ~ (p=1.000 n=10) ¹
+CallGoFromJS1000-4             135.7Ki ± 0%     135.7Ki ±  0%        ~ (p=0.895 n=10)
+NewValueString-4                 32.00 ± 0%       32.00 ±  0%        ~ (p=1.000 n=10) ¹
+ValueToGoString-4                272.0 ± 0%       272.0 ±  0%        ~ (p=1.000 n=10) ¹
+ObjectSetGet-4                   35.00 ± 0%       35.00 ±  3%        ~ (p=0.303 n=10)
+JSONParse-4                      16.00 ± 0%       16.00 ±  0%        ~ (p=1.000 n=10) ¹
+JSONStringify-4                16.00Ki ± 0%     16.00Ki ±  0%        ~ (p=1.000 n=10) ¹
+Cleanup1000Values-4              0.000 ± 0%       0.000 ±  0%        ~ (p=1.000 n=10) ¹
+CompileLodashCold-4            5.473Ki ± 5%     7.334Ki ± 18%  +34.02% (p=0.000 n=10)
+CompileLodashWithCodeCache-4     16.00 ± 0%       16.00 ±  0%        ~ (p=1.000 n=10) ¹
+StartupWithLodash-4              272.0 ± 0%       304.0 ±  0%  +11.76% (p=0.000 n=10)
+JSRegex-4                        16.00 ± 0%       16.00 ±  0%        ~ (p=1.000 n=10) ¹
+JSObjects-4                      16.00 ± 0%       16.00 ±  0%        ~ (p=1.000 n=10) ¹
+JSArrays-4                       16.00 ± 0%       16.00 ±  0%        ~ (p=1.000 n=10) ¹
+JSStrings-4                      16.00 ± 0%       16.00 ±  0%        ~ (p=1.000 n=10) ¹
+JSJSON-4                         16.00 ± 0%       16.00 ±  0%        ~ (p=1.000 n=10) ¹
+HeapPerIsolate-4                 240.0 ± 0%       272.0 ±  0%  +13.33% (p=0.000 n=10)
+HeapPerContext-4               4.828Ki ± 0%     4.859Ki ±  0%   +0.65% (p=0.000 n=10)
+geomean                                     ²                   +3.57%                ²
+¹ all samples are equal
+² summaries must be >0 to compute geomean
+
+                             │   baseline    │                  new                  │
+                             │   allocs/op   │  allocs/op   vs base                  │
+NewIsolate-4                    4.000 ± 0%      5.000 ± 0%  +25.00% (p=0.000 n=10)
+NewContext-4                    5.000 ± 0%      5.000 ± 0%        ~ (p=1.000 n=10) ¹
+RunScriptTrivial-4              1.000 ± 0%      1.000 ± 0%        ~ (p=1.000 n=10) ¹
+CallJSFromGo-4                  4.000 ± 0%      4.000 ± 0%        ~ (p=1.000 n=10) ¹
+CallGoFromJS1000-4             7.746k ± 0%     7.746k ± 0%        ~ (p=1.000 n=10) ¹
+NewValueString-4                2.000 ± 0%      2.000 ± 0%        ~ (p=1.000 n=10) ¹
+ValueToGoString-4               2.000 ± 0%      2.000 ± 0%        ~ (p=1.000 n=10) ¹
+ObjectSetGet-4                  2.000 ± 0%      2.000 ± 0%        ~ (p=1.000 n=10) ¹
+JSONParse-4                     1.000 ± 0%      1.000 ± 0%        ~ (p=1.000 n=10) ¹
+JSONStringify-4                 1.000 ± 0%      1.000 ± 0%        ~ (p=1.000 n=10) ¹
+Cleanup1000Values-4             0.000 ± 0%      0.000 ± 0%        ~ (p=1.000 n=10) ¹
+CompileLodashCold-4             1.000 ± 0%      1.000 ± 0%        ~ (p=1.000 n=10) ¹
+CompileLodashWithCodeCache-4    1.000 ± 0%      1.000 ± 0%        ~ (p=1.000 n=10) ¹
+StartupWithLodash-4             12.00 ± 0%      13.00 ± 0%   +8.33% (p=0.000 n=10)
+JSRegex-4                       1.000 ± 0%      1.000 ± 0%        ~ (p=1.000 n=10) ¹
+JSObjects-4                     1.000 ± 0%      1.000 ± 0%        ~ (p=1.000 n=10) ¹
+JSArrays-4                      1.000 ± 0%      1.000 ± 0%        ~ (p=1.000 n=10) ¹
+JSStrings-4                     1.000 ± 0%      1.000 ± 0%        ~ (p=1.000 n=10) ¹
+JSJSON-4                        1.000 ± 0%      1.000 ± 0%        ~ (p=1.000 n=10) ¹
+HeapPerIsolate-4                10.00 ± 0%      11.00 ± 0%  +10.00% (p=0.000 n=10)
+HeapPerContext-4                304.0 ± 0%      305.0 ± 0%   +0.33% (p=0.000 n=10)
+geomean                                    ²                 +1.93%                ²
+¹ all samples are equal
+² summaries must be >0 to compute geomean
+
+                             │   baseline    │                   new                   │
+                             │      B/s      │      B/s        vs base                 │
+JSONParse-4                    37.49Mi ± 25%   100.25Mi ± 11%  +167.37% (p=0.000 n=10)
+JSONStringify-4                82.85Mi ± 21%   169.71Mi ±  6%  +104.83% (p=0.000 n=10)
+CompileLodashCold-4            85.46Mi ±  6%    63.24Mi ± 16%   -26.01% (p=0.000 n=10)
+CompileLodashWithCodeCache-4   450.7Mi ±  5%    345.0Mi ±  5%   -23.45% (p=0.000 n=10)
+geomean                        104.6Mi          138.8Mi         +32.71%
+
+                 │  baseline   │                 new                 │
+                 │  heapB/iso  │  heapB/iso   vs base                │
+HeapPerIsolate-4   744.6k ± 0%   191.4k ± 0%  -74.29% (p=0.000 n=10)
+
+                 │  baseline   │                 new                 │
+                 │  heapB/ctx  │  heapB/ctx   vs base                │
+HeapPerContext-4   69.83k ± 0%   88.31k ± 0%  +26.46% (p=0.000 n=10)

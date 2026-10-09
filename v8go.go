@@ -12,6 +12,7 @@ package v8go
 import "C"
 import (
 	"strings"
+	"sync"
 	"unsafe"
 )
 
@@ -29,3 +30,14 @@ func SetFlags(flags ...string) {
 	C.SetFlags(cflags)
 	C.free(unsafe.Pointer(cflags))
 }
+
+func initializeIfNecessary() {
+	v8once.Do(func() {
+		cflags := C.CString("--no-freeze_flags_after_init")
+		defer C.free(unsafe.Pointer(cflags))
+		C.SetFlags(cflags)
+		C.Init()
+	})
+}
+
+var v8once sync.Once

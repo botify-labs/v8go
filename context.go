@@ -5,7 +5,7 @@
 package v8go
 
 // #include <stdlib.h>
-// #include "v8go.h"
+// #include "context.h"
 import "C"
 import (
 	"runtime"
@@ -76,10 +76,15 @@ func NewContext(opt ...ContextOption) *Context {
 	return ctx
 }
 
-// Isolate gets the current context's parent isolate.An  error is returned
-// if the isolate has been terninated.
+// Isolate gets the current context's parent isolate.
 func (c *Context) Isolate() *Isolate {
 	return c.iso
+}
+
+func (c *Context) RetainedValueCount() int {
+	ctxMutex.Lock()
+	defer ctxMutex.Unlock()
+	return int(C.ContextRetainedValueCount(c.ptr))
 }
 
 // RunScript executes the source JavaScript; origin (a.k.a. filename) provides a
@@ -156,9 +161,15 @@ func getContext(ref int) *Context {
 	return r.ctx
 }
 
+// goContext returns the context with the given ref, or nil if it is
+// closed.
+//
 //export goContext
 func goContext(ref int) C.ContextPtr {
 	ctx := getContext(ref)
+	if ctx == nil {
+		return nil
+	}
 	return ctx.ptr
 }
 

@@ -1,0 +1,224 @@
+name: Botify CI
+
+# Pushes to master, and PRs (each push to a PR's branch). A branch without a
+# PR: run it by hand.
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bridge-fresh:
+    name: Prebuilt bridges match sources
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+    - name: Install llvm (llvm-ar and llvm-nm for the archive checks)
+      run: sudo apt-get update && sudo apt-get install -y llvm
+    - run: tools/check_bridge.sh
+    - name: V8 archives carry no allocator shim
+      run: tools/check_no_allocator_shim.sh
+    - name: V8's C++ runtime is renamed in the Linux archives (no clash with libstdc++)
+      run: tools/check_cxx_runtime_isolated.sh
+    - name: Windows archives use the static CRT (/MT, no msvcrt/msvcprt)
+      run: |
+        bad=0
+        for lib in deps/windows_amd64/*.lib; do
+          if grep -aqiE '[-/]defaultlib:"?(msvcrt|msvcprt)' "$lib"; then
+            echo "$lib has /MD objects (DLL CRT)" >&2
+            bad=1
+          fi
+        done
+        exit $bad
+
+  pinned-deps-fresh:
+    # Consumers don't get deps/* from this commit: MVS takes the deps modules'
+    # versions from go.mod. Those modules must carry the bridges of the current
+    # sources. After a C++ change, this fails until botify-bridge has committed
+    # the new bridges and tools/pin_deps.sh <bridge commit> is pushed (BOTIFY.md).
+    name: Pinned deps modules carry the current bridges
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        # The pinned commits: their deps/<os>_<arch> trees are compared with
+        # HEAD's. Trees only: no blobs of the history (V8 archives).
+        fetch-depth: 0
+        filter: blob:none
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - run: tools/check_pinned_deps.sh
+
+  vendor:
+    # tommie's Vendor Check workflow is dropped by tools/sync_tommie.sh: a
+    # consumer module that vendors v8go (go mod vendor) must still get the
+    # header directories cgo needs (tommie/v8go#116).
+    name: Vendored consumer build (go mod vendor)
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - run: tools/check_vendor.sh
+      env:
+        CC: gcc
+
+  test:
+    name: Tests on ${{ matrix.os }} ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - { os: linux, arch: amd64, platform: ubuntu-24.04, consumer_cc: gcc, race: -race }
+        - { os: linux, arch: arm64, platform: ubuntu-24.04-arm, consumer_cc: gcc, race: -race }
+        - { os: darwin, arch: amd64, platform: macos-15-intel, consumer_cc: /usr/bin/clang, race: -race }
+        - { os: darwin, arch: arm64, platform: macos-15, consumer_cc: /usr/bin/clang, race: -race }
+        - { os: windows, arch: amd64, platform: windows-latest, consumer_cc: 'clang -fuse-ld=lld', race: -race }
+    runs-on: ${{ matrix.platform }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup-clang
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - name: The runner is the matrix platform (the committed bridge for it is the one tested)
+      run: |
+        echo "runner: $(uname -sm), Go: $(go env GOOS)_$(go env GOARCH)"
+        [ "$(go env GOOS)_$(go env GOARCH)" = "${{ matrix.os }}_${{ matrix.arch }}" ]
+    - run: go work init . ./deps/${{ matrix.os }}_${{ matrix.arch }}
+    # No rebuild: the consumer tests link the committed deps/<os>_<arch> bridge,
+    # the one botify-bridge built for this platform. bridge-fresh and
+    # pinned-deps-fresh check that it matches the sources; the source-mode tests
+    # below compile the C++ sources themselves.
+    - name: Consumer-mode tests (committed bridge, system compiler, no flags)
+      run: CC="${{ matrix.consumer_cc }}" CGO_CXXFLAGS= go test ${{ matrix.race }} -count=1 ./...
+    - name: Source-mode tests
+      run: go test -tags v8go_source -count=1 ./...
+      env:
+        CGO_CXXFLAGS: "-nostdinc++"
+
+  static-cxx-probe:
+    # A consumer binary linked fully statically with v8go and g++-built C++
+    # (libstdc++.a): V8's C++ runtime is renamed in the Linux archives
+    # (tools/cxx-runtime-rename.map), so the two runtimes don't clash, and each
+    # one's exceptions and RTTI keep working (internal/cxxprobe).
+    name: Fully static binary with g++ C++ code on linux ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - { arch: amd64, platform: ubuntu-24.04 }
+        - { arch: arm64, platform: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.platform }}
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - run: go work init . ./deps/linux_${{ matrix.arch }}
+    - name: Fully static link (gcc, g++, libstdc++.a, no flags)
+      run: |
+        CC=gcc CXX=g++ CGO_CXXFLAGS= go test -c -o cxxprobe.test -tags 'netgo osusergo cxxprobe' \
+          -ldflags "-linkmode external -extldflags '-static -lm'" ./internal/cxxprobe
+    - name: The binary is static and holds both C++ runtimes
+      run: |
+        file cxxprobe.test
+        if readelf -lW cxxprobe.test | grep -q INTERP; then echo "cxxprobe.test is dynamic" >&2; exit 1; fi
+        for s in __cxa_throw __gxx_personality_v0 _ZTISt9exception; do
+          nm cxxprobe.test | grep -qE " $s\$" || { echo "missing libstdc++'s $s" >&2; exit 1; }
+          nm cxxprobe.test | grep -qE " $s\.v8cr\$" || { echo "missing V8's $s.v8cr" >&2; exit 1; }
+        done
+    - name: Run it
+      run: ./cxxprobe.test -test.v -test.count=1
+    - name: Dynamic link (libstdc++.so)
+      run: CC=gcc CXX=g++ CGO_CXXFLAGS= go test -count=1 -v -tags cxxprobe ./internal/cxxprobe
+
+
+  glibc-floor:
+    # A consumer binary linked on glibc 2.34 needs at most GLIBC_2.34 and passes
+    # the tests there. The linker binds the archives' unversioned libc/libm
+    # references to the build host's default versions (on ubuntu-24.04,
+    # fmod@GLIBC_2.38), so the binary is built, checked and run on a glibc 2.34
+    # distribution (EL9: Rocky Linux 9; the Docker Hub library image
+    # rockylinux:9 is no longer updated).
+    name: Consumer build and tests on glibc 2.34 (at most GLIBC_2.34)
+    runs-on: ubuntu-24.04
+    container:
+      image: rockylinux/rockylinux:9
+      # The image sets no PATH; JavaScript actions (checkout) need one to
+      # find tar and git.
+      env:
+        PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOFLAGS: -buildvcs=false
+    steps:
+    - name: Install gcc, binutils, git and Go 1.27
+      run: |
+        dnf install -y -q gcc binutils git tar gzip
+        curl -fsSL 'https://go.dev/dl/?mode=json&include=all' -o "$RUNNER_TEMP/go.json"
+        ver=$(grep -oE '"go1\.27\.[0-9]+"' "$RUNNER_TEMP/go.json" | tr -d '"' | sort -Vu | tail -1)
+        [ -n "$ver" ] || { echo "no go1.27.x release found" >&2; exit 1; }
+        sum=$(tr -d '\n ' <"$RUNNER_TEMP/go.json" |
+          grep -oE "\"filename\":\"$ver\.linux-amd64\.tar\.gz\"[^}]*" |
+          grep -oE '"sha256":"[0-9a-f]{64}"' | grep -oE '[0-9a-f]{64}' | head -1)
+        [ -n "$sum" ] || { echo "no sha256 for $ver.linux-amd64.tar.gz" >&2; exit 1; }
+        curl -fsSLo "$RUNNER_TEMP/go.tgz" "https://go.dev/dl/$ver.linux-amd64.tar.gz"
+        echo "$sum  $RUNNER_TEMP/go.tgz" | sha256sum -c -
+        tar -C /usr/local -xzf "$RUNNER_TEMP/go.tgz"
+        echo /usr/local/go/bin >>"$GITHUB_PATH"
+    - uses: actions/checkout@v7
+    - run: go version && go work init . ./deps/linux_amd64
+    - name: Build the consumer test binary (prebuilt bridge, gcc, no flags)
+      run: CC=gcc CGO_CXXFLAGS= go test -c -o v8go.test .
+    - name: glibc floor (at most GLIBC_2.34)
+      run: |
+        max=$(objdump -T v8go.test | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1)
+        echo "highest glibc symbol version: ${max:-none}"
+        [ -n "$max" ] || { echo "no GLIBC_ symbol found: is v8go.test a dynamic binary?" >&2; exit 1; }
+        top=$(printf '%s\nGLIBC_2.34\n' "$max" | sort -V | tail -1)
+        [ "$top" = GLIBC_2.34 ] || { echo "v8go.test needs $max, newer than GLIBC_2.34" >&2; exit 1; }
+    - name: Run the tests on glibc 2.34
+      run: ./v8go.test -test.count=1
+
+  leakcheck:
+    name: LeakSanitizer (source mode)
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup-clang
+      with:
+        extra-packages: libclang-rt-{version}-dev
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - run: go work init . ./deps/linux_amd64
+    - run: go test -c -tags "leakcheck v8go_source" -o v8go.test . && ./v8go.test
+      env:
+        CGO_CXXFLAGS: "-nostdinc++"
+
+  soak:
+    name: Cleanup soak (consumer mode)
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - name: Soak
+      working-directory: bench
+      run: |
+        # bench/go.mod replaces the baseline module; only -tags v8baseline imports it.
+        mkdir -p ../../v8go-baseline && printf 'module rogchap.com/v8go\n\ngo 1.16\n' >../../v8go-baseline/go.mod
+        SOAK_ITERATIONS=30000 GOWORK=off CC=gcc go test -tags soak -run TestSoakCleanup -v -timeout 1h .

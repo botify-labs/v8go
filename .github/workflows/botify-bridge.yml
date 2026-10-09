@@ -1,0 +1,119 @@
+name: Botify Bridge
+
+# Rebuilds the prebuilt C++ bridge for every platform and commits it to the
+# branch the workflow runs on. Run it after a tommie sync or a C++ change.
+on:
+  # By hand: always rebuilds.
+  workflow_dispatch:
+  # A push to any branch but master that changes the C++ sources, Botify's
+  # patches to tommie's files, the V8 version, the C++ runtime rename of the
+  # Linux bridges (tools/cxx-runtime-rename.map) or the scripts that shape the
+  # bridge rebuilds the bridges, but only when they are stale
+  # (tools/check_bridge.sh): a push that leaves the fingerprint unchanged, such
+  # as an edit of this file, commits nothing. The bot commits on the pushed
+  # branch (its commit doesn't trigger workflows), so the bridges are rebuilt on
+  # the PR branch and never pushed to master, which only changes through PRs
+  # (BOTIFY.md). The fingerprint also covers the Go files with
+  # //export (tools/bridge_hash.sh): after a change to one of those alone,
+  # botify-ci's check_bridge fails; run this one by hand.
+  push:
+    branches-ignore: [master]
+    paths:
+    - .github/workflows/botify-bridge.yml
+    - '*.cc'
+    - '*.h'
+    - tools/patches/**
+    - deps/v8_hash
+    - tools/cxx-runtime-rename.map
+    - tools/rename_cxx_runtime.sh
+    - tools/build_bridge.sh
+    - tools/bridge_hash.sh
+    - .github/actions/setup-clang/action.yml
+
+# One run at a time per branch, in push order: a run commits the bridges of
+# its own commit, and a later push's run waits for it (then rebuilds if they
+# are stale for its sources) instead of racing it.
+concurrency:
+  group: botify-bridge-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  stale:
+    name: Bridges stale?
+    runs-on: ubuntu-24.04
+    outputs:
+      rebuild: ${{ steps.check.outputs.rebuild }}
+    steps:
+    - uses: actions/checkout@v7
+    - id: check
+      env:
+        EVENT: ${{ github.event_name }}
+      run: |
+        if [ "$EVENT" = workflow_dispatch ] || ! tools/check_bridge.sh; then
+          echo rebuild=true >>"$GITHUB_OUTPUT"
+        else
+          echo "bridges match the sources: nothing to rebuild"
+          echo rebuild=false >>"$GITHUB_OUTPUT"
+        fi
+
+  build:
+    needs: stale
+    if: needs.stale.outputs.rebuild == 'true'
+    name: Bridge ${{ matrix.os }}_${{ matrix.arch }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+        - { os: linux, arch: amd64, platform: ubuntu-24.04 }
+        - { os: linux, arch: arm64, platform: ubuntu-24.04-arm }
+        - { os: darwin, arch: amd64, platform: macos-15-intel }
+        - { os: darwin, arch: arm64, platform: macos-15 }
+        - { os: windows, arch: amd64, platform: windows-latest }
+    runs-on: ${{ matrix.platform }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup-clang
+    - uses: actions/setup-go@v7
+      with:
+        go-version: '1.27'
+    - run: go work init . ./deps/${{ matrix.os }}_${{ matrix.arch }}
+    - run: tools/build_bridge.sh
+    - uses: actions/upload-artifact@v4
+      with:
+        name: bridge-${{ matrix.os }}_${{ matrix.arch }}
+        path: |
+          deps/${{ matrix.os }}_${{ matrix.arch }}/libv8go.a
+          deps/${{ matrix.os }}_${{ matrix.arch }}/v8go.lib
+          deps/${{ matrix.os }}_${{ matrix.arch }}/bridge.sha256
+        if-no-files-found: ignore
+
+  commit:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: bridge-*
+        path: artifacts
+    - name: Install bridges
+      run: |
+        for d in artifacts/bridge-*; do
+          cp "$d"/* "deps/${d#artifacts/bridge-}/"
+        done
+        tools/check_bridge.sh
+    # Never on master, also by hand (workflow_dispatch accepts it): master only
+    # changes through PRs, and pinned deps commits must stay reachable.
+    - if: github.ref != 'refs/heads/master'
+      uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
+      with:
+        commit_message: Rebuild prebuilt v8go bridges
+        file_pattern: deps/*/libv8go.a deps/*/v8go.lib deps/*/bridge.sha256

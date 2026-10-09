@@ -1,0 +1,53 @@
+diff --git a/context.cc b/context.cc
+index 453117c..f24bd0b 100644
+--- a/context.cc
++++ b/context.cc
+@@ -6,6 +6,7 @@
+ #include "_cgo_export.h"
+ #include "deps/include/v8-template.h"
+ 
++#include "botify_context.h"
+ #include "context-macros.h"
+ #include "template.h"
+ #include "unbound_script.h"
+@@ -38,6 +39,7 @@ ContextPtr NewContext(IsolatePtr iso,
+   m_ctx* ctx = new m_ctx;
+   ctx->ptr.Reset(iso, local_ctx);
+   ctx->iso = iso;
++  BotifyContextSet(local_ctx, ctx);
+   return ctx;
+ }
+ 
+@@ -45,6 +47,7 @@ void ContextFree(ContextPtr ctx) {
+   if (ctx == nullptr) {
+     return;
+   }
++  BotifyContextForget(ctx);
+   ctx->ptr.Reset();
+ 
+   for (m_value* value : ctx->vals) {
+diff --git a/function_template.cc b/function_template.cc
+index 9d8cd49..8cb93b7 100644
+--- a/function_template.cc
++++ b/function_template.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "_cgo_export.h"
+ 
++#include "botify_context.h"
+ #include "deps/include/v8-context.h"
+ #include "deps/include/v8-function.h"
+ #include "isolate-macros.h"
+@@ -23,7 +24,11 @@ void FunctionTemplateCallback(const FunctionCallbackInfo<Value>& info) {
+   int ctx_ref = local_ctx->GetEmbedderDataV2(ContextDataIndex::REF)
+                     .As<Integer>()
+                     ->Value();
+-  m_ctx* ctx = goContext(ctx_ref);
++  // Botify: found without a call into Go, unless the Context is closed.
++  m_ctx* ctx = BotifyContextGet(iso, local_ctx);
++  if (ctx == nullptr) {
++    ctx = goContext(ctx_ref);
++  }
+ 
+   int callback_ref = info.Data().As<Integer>()->Value();
+ 

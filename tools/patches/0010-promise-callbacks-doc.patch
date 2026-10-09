@@ -1,0 +1,16 @@
+diff --git a/promise.go b/promise.go
+index 05966b3..e059aeb 100644
+--- a/promise.go
++++ b/promise.go
+@@ -93,6 +93,11 @@ func (p *Promise) Result() *Value {
+ // V8 only invokes the callback when processing "microtasks".
+ // The default MicrotaskPolicy processes them when the call depth decreases to 0.
+ // Call (*Context).PerformMicrotaskCheckpoint to trigger it manually.
++//
++// Botify: like a FunctionTemplate's, each callback is kept by the Isolate
++// until Isolate.Dispose, also once the promise is settled or collected: on a
++// long-lived Isolate, every Then or Catch call keeps its Go callbacks (and
++// whatever they reference) for the Isolate's lifetime.
+ func (p *Promise) Then(cbs ...FunctionCallback) *Promise {
+ 	cbwes := make([]FunctionCallbackWithError, len(cbs))
+ 	for i, cb := range cbs {

@@ -1,0 +1,372 @@
+diff --git a/context-macros.h b/context-macros.h
+index 7d75d30..e22a115 100644
+--- a/context-macros.h
++++ b/context-macros.h
+@@ -6,12 +6,14 @@
+ #include "deps/include/v8-local-handle.h"
+ #include "deps/include/v8-locker.h"
+ 
++#include "botify_termination.h"
+ #include "context.h"
+ 
+ #define LOCAL_CONTEXT(ctx)                              \
+   v8::Isolate* iso = ctx->iso;                          \
+   v8::Locker locker(iso);                               \
+   v8::Isolate::Scope isolate_scope(iso);                \
++  BotifyEntry botify_entry(iso);                        \
+   v8::HandleScope handle_scope(iso);                    \
+   v8::TryCatch try_catch(iso);                          \
+   v8::Local<v8::Context> local_ctx = ctx->ptr.Get(iso); \
+diff --git a/context.cc b/context.cc
+index f24bd0b..83e1f85 100644
+--- a/context.cc
++++ b/context.cc
+@@ -105,6 +105,7 @@ int ContextRetainedValueCount(ContextPtr ctx) {
+ 
+ RtnValue RunScript(ContextPtr ctx, const char* source, const char* origin) {
+   LOCAL_CONTEXT(ctx);
++  BotifyRunScope botify_run(botify_entry);
+ 
+   RtnValue rtn = {};
+ 
+diff --git a/function_template.cc b/function_template.cc
+index 12e3d31..c75acc7 100644
+--- a/function_template.cc
++++ b/function_template.cc
+@@ -5,6 +5,7 @@
+ #include "_cgo_export.h"
+ 
+ #include "botify_context.h"
++#include "botify_termination.h"
+ #include "deps/include/v8-context.h"
+ #include "deps/include/v8-function.h"
+ #include "isolate-macros.h"
+@@ -80,6 +81,13 @@ void FunctionTemplateCallback(const FunctionCallbackInfo<Value>& info) {
+   if (iso->IsExecutionTerminating()) {
+     return;
+   }
++  // Botify: a termination is owed to the run, but not pending: a V8 call of
++  // the callback cleared it (botify_termination.h). It must still terminate
++  // the JavaScript that called the callback.
++  if (BotifyTerminationOwed(iso)) {
++    BotifyTerminateNow(iso);
++    return;
++  }
+   if (retval.r1 != nullptr) {
+     iso->ThrowException(retval.r1->ptr.Get(iso));
+   } else if (retval.r0 != nullptr) {
+diff --git a/isolate-macros.h b/isolate-macros.h
+index cece58f..0448faf 100644
+--- a/isolate-macros.h
++++ b/isolate-macros.h
+@@ -5,6 +5,7 @@
+ #include "deps/include/v8-isolate.h"
+ #include "deps/include/v8-locker.h"
+ 
++#include "botify_termination.h"
+ #include "context.h"
+ #include "isolate.h"
+ 
+@@ -15,6 +16,7 @@ static inline m_ctx* isolateInternalContext(v8::Isolate* iso) {
+ #define ISOLATE_SCOPE(iso)           \
+   Locker locker(iso);                \
+   Isolate::Scope isolate_scope(iso); \
++  BotifyEntry botify_entry(iso);     \
+   HandleScope handle_scope(iso);
+ 
+ #define INTERNAL_CONTEXT(iso) m_ctx* ctx = static_cast<m_ctx*>(iso->GetData(0));
+diff --git a/isolate.cc b/isolate.cc
+index 3899f0f..00f21af 100644
+--- a/isolate.cc
++++ b/isolate.cc
+@@ -11,6 +11,7 @@
+ 
+ #include "_cgo_export.h"
+ #include "botify_context.h"
++#include "botify_termination.h"
+ #include "context.h"
+ #include "isolate.h"
+ #include "libplatform/libplatform.h"
+@@ -65,6 +66,7 @@ struct IsolateState {
+ #define ISOLATE_SCOPE(iso)           \
+   Locker locker(iso);                \
+   Isolate::Scope isolate_scope(iso); \
++  BotifyEntry botify_entry(iso);     \
+   HandleScope handle_scope(iso);
+ 
+ void Init() {
+@@ -85,7 +87,8 @@ size_t NearMemoryLimitCallback(void* data,
+   auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
+   state->heap_limit_reached = true;
+   state->heap_limit_raised.store(true, std::memory_order_relaxed);
+-  iso->TerminateExecution();
++  // Botify: counted, see botify_termination.h.
++  BotifyRequestTermination(iso);
+ 
+   // if we return the initial heap limit, the VM will crash, so here we give it
+   // room to exit gracefully
+@@ -113,6 +116,7 @@ IsolatePtr NewIsolate(IsolateConstraintsPtr constraints) {
+   // Try to catch the OOM condition and stop execution before killing the
+   // process
+   iso->SetData(ISOLATE_STATE_SLOT, new IsolateState);
++  BotifyTerminationInit(iso);
+   iso->AddNearHeapLimitCallback(NearMemoryLimitCallback, iso);
+   // The callback raises the heap limit, so the isolate can be reused
+   // after the termination. Without this, the raised limit is kept, and
+@@ -130,6 +134,7 @@ IsolatePtr NewIsolate(IsolateConstraintsPtr constraints) {
+ 
+ void IsolatePerformMicrotaskCheckpoint(IsolatePtr iso) {
+   ISOLATE_SCOPE(iso)
++  BotifyRunScope botify_run(botify_entry);
+   iso->PerformMicrotaskCheckpoint();
+ }
+ 
+@@ -140,9 +145,11 @@ void IsolateDispose(IsolatePtr iso) {
+   auto ctx = static_cast<m_ctx*>(iso->GetData(0));
+   ContextFree(ctx);
+   auto state = static_cast<IsolateState*>(iso->GetData(ISOLATE_STATE_SLOT));
++  auto termination = BotifyTerminationOf(iso);
+ 
+   iso->Dispose();
+   delete state;
++  delete termination;
+ }
+ 
+ void IsolateSetExceptionMessages(IsolatePtr iso, int enabled) {
+@@ -182,7 +189,8 @@ void IsolateResetHeapLimitReached(IsolatePtr iso) {
+ }
+ 
+ void IsolateTerminateExecution(IsolatePtr iso) {
+-  iso->TerminateExecution();
++  // Botify: counted, see botify_termination.h.
++  BotifyRequestTermination(iso);
+ }
+ 
+ int IsolateIsExecutionTerminating(IsolatePtr iso) {
+diff --git a/isolate.go b/isolate.go
+index 4f152ce..4c373c7 100644
+--- a/isolate.go
++++ b/isolate.go
+@@ -153,6 +153,25 @@ func NewIsolate(opts ...IsolateOption) *Isolate {
+ 
+ // TerminateExecution terminates forcefully the current thread
+ // of JavaScript execution in the given isolate.
++//
++// Botify: it can be called from any goroutine, and terminates the whole run
++// in progress, i.e. the top-level script or function call, with the Go
++// callbacks it calls and the scripts they run: their later V8 calls don't
++// cancel it, and the JavaScript those run is terminated at its first
++// instruction. Requested while no run is in progress, it terminates the next
++// run of RunScript, UnboundScript.Run, Function.Call, Function.NewInstance or
++// PerformMicrotaskCheckpoint, on whatever OS thread it runs (V8 itself keeps
++// the request with the state of one thread, so that a run on another thread
++// missed it and a later run of the first thread got it instead). Requested
++// just as a run ends, it is dropped rather than terminate the next run;
++// Isolate.Cleanup cancels the requests made until it ends.
++//
++// Other entry points that run JavaScript (Value.String on an object,
++// Object.Get on a getter, JSONStringify...) called at the top level, outside
++// a run, only see a request V8 holds for the calling thread. A watchdog that
++// must stop a run whatever it does should therefore request the termination
++// again periodically until the run returns, rather than once. It must not be
++// called concurrently with Dispose, nor after it.
+ func (i *Isolate) TerminateExecution() {
+ 	C.IsolateTerminateExecution(i.ptr)
+ }
+diff --git a/object.cc b/object.cc
+index 2aebb71..62671be 100644
+--- a/object.cc
++++ b/object.cc
+@@ -146,34 +146,34 @@ int ObjectHas(ValuePtr ptr, const char* key) {
+   LOCAL_OBJECT(ptr);
+   Local<String> key_val =
+       String::NewFromUtf8(iso, key, NewStringType::kNormal).ToLocalChecked();
+-  return obj->Has(local_ctx, key_val).ToChecked();
++  return obj->Has(local_ctx, key_val).FromMaybe(false);
+ }
+ 
+ int ObjectHasAnyKey(ValuePtr ptr, ValuePtr key) {
+   LOCAL_OBJECT(ptr);
+   Local<Value> local_key = key->ptr.Get(iso);
+-  return obj->Has(local_ctx, local_key).ToChecked();
++  return obj->Has(local_ctx, local_key).FromMaybe(false);
+ }
+ 
+ int ObjectHasIdx(ValuePtr ptr, uint32_t idx) {
+   LOCAL_OBJECT(ptr);
+-  return obj->Has(local_ctx, idx).ToChecked();
++  return obj->Has(local_ctx, idx).FromMaybe(false);
+ }
+ 
+ int ObjectDelete(ValuePtr ptr, const char* key) {
+   LOCAL_OBJECT(ptr);
+   Local<String> key_val =
+       String::NewFromUtf8(iso, key, NewStringType::kNormal).ToLocalChecked();
+-  return obj->Delete(local_ctx, key_val).ToChecked();
++  return obj->Delete(local_ctx, key_val).FromMaybe(false);
+ }
+ 
+ int ObjectDeleteAnyKey(ValuePtr ptr, ValuePtr key) {
+   LOCAL_OBJECT(ptr);
+   Local<Value> local_key = key->ptr.Get(iso);
+-  return obj->Delete(local_ctx, local_key).ToChecked();
++  return obj->Delete(local_ctx, local_key).FromMaybe(false);
+ }
+ 
+ int ObjectDeleteIdx(ValuePtr ptr, uint32_t idx) {
+   LOCAL_OBJECT(ptr);
+-  return obj->Delete(local_ctx, idx).ToChecked();
++  return obj->Delete(local_ctx, idx).FromMaybe(false);
+ }
+diff --git a/template-macros.h b/template-macros.h
+index cf8cb6b..d044dc4 100644
+--- a/template-macros.h
++++ b/template-macros.h
+@@ -6,10 +6,13 @@
+ #include "deps/include/v8-locker.h"
+ #include "deps/include/v8-template.h"
+ 
++#include "botify_termination.h"
++
+ #define LOCAL_TEMPLATE(tmpl_ptr)     \
+   Isolate* iso = tmpl_ptr->iso;      \
+   Locker locker(iso);                \
+   Isolate::Scope isolate_scope(iso); \
++  BotifyEntry botify_entry(iso);     \
+   HandleScope handle_scope(iso);     \
+   Local<Template> tmpl = tmpl_ptr->ptr.Get(iso);
+ 
+diff --git a/unbound_script.cc b/unbound_script.cc
+index 2e25920..05b8e57 100644
+--- a/unbound_script.cc
++++ b/unbound_script.cc
+@@ -40,6 +40,7 @@ void ScriptCompilerCachedDataDelete(ScriptCompilerCachedData* cached_data) {
+ // the script was compiled in
+ RtnValue UnboundScriptRun(ContextPtr ctx, UnboundScriptPtr us_ptr) {
+   LOCAL_CONTEXT(ctx)
++  BotifyRunScope botify_run(botify_entry);
+ 
+   RtnValue rtn = {};
+ 
+diff --git a/v8go.cc b/v8go.cc
+index 1afec9b..7d8e57d 100644
+--- a/v8go.cc
++++ b/v8go.cc
+@@ -313,6 +313,7 @@ const char* JSONStringify(ContextPtr ctx, ValuePtr val) {
+ 
+   Locker locker(iso);
+   Isolate::Scope isolate_scope(iso);
++  BotifyEntry botify_entry(iso);
+   HandleScope handle_scope(iso);
+ 
+   if (ctx != nullptr) {
+@@ -381,13 +382,13 @@ ValuePtr PromiseResolverGetPromise(ValuePtr ptr) {
+ int PromiseResolverResolve(ValuePtr ptr, ValuePtr resolve_val) {
+   LOCAL_VALUE(ptr);
+   Local<Promise::Resolver> resolver = value.As<Promise::Resolver>();
+-  return resolver->Resolve(local_ctx, resolve_val->ptr.Get(iso)).ToChecked();
++  return resolver->Resolve(local_ctx, resolve_val->ptr.Get(iso)).FromMaybe(false);
+ }
+ 
+ int PromiseResolverReject(ValuePtr ptr, ValuePtr reject_val) {
+   LOCAL_VALUE(ptr);
+   Local<Promise::Resolver> resolver = value.As<Promise::Resolver>();
+-  return resolver->Reject(local_ctx, reject_val->ptr.Get(iso)).ToChecked();
++  return resolver->Reject(local_ctx, reject_val->ptr.Get(iso)).FromMaybe(false);
+ }
+ 
+ int PromiseState(ValuePtr ptr) {
+@@ -398,6 +399,7 @@ int PromiseState(ValuePtr ptr) {
+ 
+ RtnValue PromiseThen(ValuePtr ptr, int callback_ref) {
+   LOCAL_VALUE(ptr)
++  BotifyHoldTermination botify_hold(botify_entry);
+   RtnValue rtn = {};
+   Local<Promise> promise = value.As<Promise>();
+   Local<Integer> cbData = Integer::New(iso, callback_ref);
+@@ -423,6 +425,7 @@ RtnValue PromiseThen(ValuePtr ptr, int callback_ref) {
+ 
+ RtnValue PromiseThen2(ValuePtr ptr, int on_fulfilled_ref, int on_rejected_ref) {
+   LOCAL_VALUE(ptr)
++  BotifyHoldTermination botify_hold(botify_entry);
+   RtnValue rtn = {};
+   Local<Promise> promise = value.As<Promise>();
+   Local<Integer> onFulfilledData = Integer::New(iso, on_fulfilled_ref);
+@@ -456,6 +459,7 @@ RtnValue PromiseThen2(ValuePtr ptr, int on_fulfilled_ref, int on_rejected_ref) {
+ 
+ RtnValue PromiseCatch(ValuePtr ptr, int callback_ref) {
+   LOCAL_VALUE(ptr)
++  BotifyHoldTermination botify_hold(botify_entry);
+   RtnValue rtn = {};
+   Local<Promise> promise = value.As<Promise>();
+   Local<Integer> cbData = Integer::New(iso, callback_ref);
+@@ -503,6 +507,7 @@ static void buildCallArguments(std::vector<Local<Value>>* out,
+ 
+ RtnValue FunctionCall(ValuePtr ptr, ValuePtr recv, int argc, ValuePtr args[]) {
+   LOCAL_VALUE(ptr)
++  BotifyRunScope botify_run(botify_entry);
+ 
+   RtnValue rtn = {};
+   Local<Function> fn = Local<Function>::Cast(value);
+@@ -528,6 +533,7 @@ RtnValue FunctionCall(ValuePtr ptr, ValuePtr recv, int argc, ValuePtr args[]) {
+ 
+ RtnValue FunctionNewInstance(ValuePtr ptr, int argc, ValuePtr args[]) {
+   LOCAL_VALUE(ptr)
++  BotifyRunScope botify_run(botify_entry);
+   RtnValue rtn = {};
+   Local<Function> fn = Local<Function>::Cast(value);
+   std::vector<Local<Value>> argv(argc);
+diff --git a/value-macros.h b/value-macros.h
+index 9fc2498..2fd5033 100644
+--- a/value-macros.h
++++ b/value-macros.h
+@@ -6,6 +6,7 @@
+ #include "deps/include/v8-isolate.h"
+ #include "deps/include/v8-locker.h"
+ 
++#include "botify_termination.h"
+ #include "context.h"
+ #include "isolate.h"
+ 
+@@ -13,6 +14,7 @@
+   Isolate* iso = val->iso;                 \
+   Locker locker(iso);                      \
+   Isolate::Scope isolate_scope(iso);       \
++  BotifyEntry botify_entry(iso);           \
+   HandleScope handle_scope(iso);           \
+   TryCatch try_catch(iso);                 \
+   m_ctx* ctx = val->ctx;                   \
+diff --git a/value.cc b/value.cc
+index 58a8f9a..a9ac59e 100644
+--- a/value.cc
++++ b/value.cc
+@@ -290,17 +290,17 @@ int ValueToBoolean(ValuePtr ptr) {
+ 
+ int32_t ValueToInt32(ValuePtr ptr) {
+   LOCAL_VALUE(ptr);
+-  return value->Int32Value(local_ctx).ToChecked();
++  return value->Int32Value(local_ctx).FromMaybe(0);
+ }
+ 
+ int64_t ValueToInteger(ValuePtr ptr) {
+   LOCAL_VALUE(ptr);
+-  return value->IntegerValue(local_ctx).ToChecked();
++  return value->IntegerValue(local_ctx).FromMaybe(0);
+ }
+ 
+ double ValueToNumber(ValuePtr ptr) {
+   LOCAL_VALUE(ptr);
+-  return value->NumberValue(local_ctx).ToChecked();
++  return value->NumberValue(local_ctx).FromMaybe(0);
+ }
+ 
+ RtnString ValueToDetailString(ValuePtr ptr) {
+@@ -329,7 +329,7 @@ RtnString ValueToString(ValuePtr ptr) {
+ 
+ uint32_t ValueToUint32(ValuePtr ptr) {
+   LOCAL_VALUE(ptr);
+-  return value->Uint32Value(local_ctx).ToChecked();
++  return value->Uint32Value(local_ctx).FromMaybe(0);
+ }
+ 
+ ValueBigInt ValueToBigInt(ValuePtr ptr) {

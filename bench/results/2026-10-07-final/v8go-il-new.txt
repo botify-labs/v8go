@@ -1,0 +1,340 @@
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkNewIsolate-16                    	    1366	    855622 ns/op	     176 B/op	       5 allocs/op
+BenchmarkNewContext-16                    	    8418	    122282 ns/op	      80 B/op	       5 allocs/op
+BenchmarkRunScriptTrivial-16              	 1724362	       703.6 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16                  	 1610122	       759.2 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16              	    3657	    325400 ns/op	  130998 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16       	    2977	    362479 ns/op	  131078 B/op	    2752 allocs/op
+BenchmarkNewValueString-16                	 4029475	       300.3 ns/op	      32 B/op	       2 allocs/op
+BenchmarkValueToGoString-16               	  773067	      1409 ns/op	     272 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16                  	 1374858	       852.0 ns/op	      36 B/op	       3 allocs/op
+BenchmarkJSONParse-16                     	   48664	     24602 ns/op	 609.75 MB/s	      16 B/op	       1 allocs/op
+BenchmarkJSONStringify-16                 	   42238	     29253 ns/op	 512.81 MB/s	   16384 B/op	       1 allocs/op
+BenchmarkCompileLodashCold-16             	     486	   2374767 ns/op	 229.12 MB/s	    2275 B/op	       1 allocs/op
+BenchmarkCompileLodashWithCodeCache-16    	    2797	    409898 ns/op	1327.40 MB/s	      16 B/op	       1 allocs/op
+BenchmarkStartupWithLodash-16             	     302	   4029482 ns/op	     304 B/op	      13 allocs/op
+BenchmarkJSRegex-16                       	   37022	     33894 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSObjects-16                     	    7616	    195671 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSArrays-16                      	     298	   3990892 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSStrings-16                     	    2674	    438498 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSJSON-16                        	    2048	    563938 ns/op	      16 B/op	       1 allocs/op
+BenchmarkHeapPerIsolate-16                	    1159	    990890 ns/op	    191444 heapB/iso	     272 B/op	      11 allocs/op
+BenchmarkHeapPerContext-16                	     186	   6769194 ns/op	     88345 heapB/ctx	    4976 B/op	     305 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	37.621s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     13524 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	1.602s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkNewIsolate-16                    	    1293	    885342 ns/op	     176 B/op	       5 allocs/op
+BenchmarkNewContext-16                    	    8964	    124575 ns/op	      80 B/op	       5 allocs/op
+BenchmarkRunScriptTrivial-16              	 1722465	       691.8 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16                  	 1645106	       756.7 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16              	    3694	    321116 ns/op	  130997 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16       	    2998	    373448 ns/op	  131078 B/op	    2752 allocs/op
+BenchmarkNewValueString-16                	 4028326	       296.2 ns/op	      32 B/op	       2 allocs/op
+BenchmarkValueToGoString-16               	  833253	      1428 ns/op	     272 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16                  	 1426148	       830.7 ns/op	      36 B/op	       3 allocs/op
+BenchmarkJSONParse-16                     	   48220	     24129 ns/op	 621.69 MB/s	      16 B/op	       1 allocs/op
+BenchmarkJSONStringify-16                 	   45282	     27311 ns/op	 549.28 MB/s	   16384 B/op	       1 allocs/op
+BenchmarkCompileLodashCold-16             	     481	   2391369 ns/op	 227.53 MB/s	    2298 B/op	       1 allocs/op
+BenchmarkCompileLodashWithCodeCache-16    	    3070	    441000 ns/op	1233.78 MB/s	      16 B/op	       1 allocs/op
+BenchmarkStartupWithLodash-16             	     268	   4171570 ns/op	     304 B/op	      13 allocs/op
+BenchmarkJSRegex-16                       	   37726	     34034 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSObjects-16                     	    5419	    524810 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSArrays-16                      	     291	   4015293 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSStrings-16                     	    2520	    432920 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSJSON-16                        	    1940	    592919 ns/op	      16 B/op	       1 allocs/op
+BenchmarkHeapPerIsolate-16                	    1212	    994830 ns/op	    191444 heapB/iso	     272 B/op	      11 allocs/op
+BenchmarkHeapPerContext-16                	     178	   6620282 ns/op	     88345 heapB/ctx	    4976 B/op	     305 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	40.143s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     13359 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	1.576s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkNewIsolate-16                    	    1489	    855747 ns/op	     176 B/op	       5 allocs/op
+BenchmarkNewContext-16                    	    8776	    121609 ns/op	      80 B/op	       5 allocs/op
+BenchmarkRunScriptTrivial-16              	 1735178	       688.0 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16                  	 1603723	       744.2 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16              	    3747	    314360 ns/op	  130998 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16       	    3048	    358100 ns/op	  131079 B/op	    2752 allocs/op
+BenchmarkNewValueString-16                	 3957476	       303.6 ns/op	      32 B/op	       2 allocs/op
+BenchmarkValueToGoString-16               	  743151	      1424 ns/op	     272 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16                  	 1414040	       841.8 ns/op	      36 B/op	       3 allocs/op
+BenchmarkJSONParse-16                     	   48924	     24072 ns/op	 623.17 MB/s	      16 B/op	       1 allocs/op
+BenchmarkJSONStringify-16                 	   46476	     26294 ns/op	 570.51 MB/s	   16384 B/op	       1 allocs/op
+BenchmarkCompileLodashCold-16             	     486	   2346192 ns/op	 231.91 MB/s	    2275 B/op	       1 allocs/op
+BenchmarkCompileLodashWithCodeCache-16    	    2886	    410784 ns/op	1324.53 MB/s	      16 B/op	       1 allocs/op
+BenchmarkStartupWithLodash-16             	     312	   3836815 ns/op	     304 B/op	      13 allocs/op
+BenchmarkJSRegex-16                       	   35173	     33199 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSObjects-16                     	    7208	    406562 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSArrays-16                      	     288	   4032891 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSStrings-16                     	    2517	    429565 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSJSON-16                        	    2028	    564416 ns/op	      16 B/op	       1 allocs/op
+BenchmarkHeapPerIsolate-16                	    1135	   1058339 ns/op	    191444 heapB/iso	     272 B/op	      11 allocs/op
+BenchmarkHeapPerContext-16                	     183	   6534983 ns/op	     88345 heapB/ctx	    4976 B/op	     305 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	38.867s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     13864 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	1.548s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkNewIsolate-16                    	    1422	    851622 ns/op	     176 B/op	       5 allocs/op
+BenchmarkNewContext-16                    	    9770	    117306 ns/op	      80 B/op	       5 allocs/op
+BenchmarkRunScriptTrivial-16              	 1693081	       700.5 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16                  	 1616808	       731.4 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16              	    3601	    317542 ns/op	  130998 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16       	    3298	    354861 ns/op	  131078 B/op	    2752 allocs/op
+BenchmarkNewValueString-16                	 3961422	       294.8 ns/op	      32 B/op	       2 allocs/op
+BenchmarkValueToGoString-16               	  754677	      1437 ns/op	     272 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16                  	 1440572	       835.6 ns/op	      36 B/op	       3 allocs/op
+BenchmarkJSONParse-16                     	   46832	     24481 ns/op	 612.76 MB/s	      16 B/op	       1 allocs/op
+BenchmarkJSONStringify-16                 	   45264	     26770 ns/op	 560.37 MB/s	   16384 B/op	       1 allocs/op
+BenchmarkCompileLodashCold-16             	     510	   2343523 ns/op	 232.17 MB/s	    2169 B/op	       1 allocs/op
+BenchmarkCompileLodashWithCodeCache-16    	    2931	    404834 ns/op	1344.00 MB/s	      16 B/op	       1 allocs/op
+BenchmarkStartupWithLodash-16             	     318	   3857517 ns/op	     304 B/op	      13 allocs/op
+BenchmarkJSRegex-16                       	   32390	     38332 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSObjects-16                     	    7100	    166253 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSArrays-16                      	     295	   4012679 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSStrings-16                     	    2548	    439072 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSJSON-16                        	    2178	    567033 ns/op	      16 B/op	       1 allocs/op
+BenchmarkHeapPerIsolate-16                	    1186	    987266 ns/op	    191444 heapB/iso	     272 B/op	      11 allocs/op
+BenchmarkHeapPerContext-16                	     189	   6283884 ns/op	     88345 heapB/ctx	    4976 B/op	     305 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	38.213s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     13626 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	1.560s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkNewIsolate-16                    	    1233	    856016 ns/op	     176 B/op	       5 allocs/op
+BenchmarkNewContext-16                    	    9446	    116514 ns/op	      80 B/op	       5 allocs/op
+BenchmarkRunScriptTrivial-16              	 1737711	       714.6 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16                  	 1637806	       718.8 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16              	    3817	    314587 ns/op	  130998 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16       	    3265	    356650 ns/op	  131078 B/op	    2752 allocs/op
+BenchmarkNewValueString-16                	 3994318	       299.1 ns/op	      32 B/op	       2 allocs/op
+BenchmarkValueToGoString-16               	  728034	      1434 ns/op	     272 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16                  	 1429857	       839.3 ns/op	      36 B/op	       3 allocs/op
+BenchmarkJSONParse-16                     	   48216	     24274 ns/op	 617.98 MB/s	      16 B/op	       1 allocs/op
+BenchmarkJSONStringify-16                 	   44995	     26745 ns/op	 560.90 MB/s	   16384 B/op	       1 allocs/op
+BenchmarkCompileLodashCold-16             	     502	   2345663 ns/op	 231.96 MB/s	    2203 B/op	       1 allocs/op
+BenchmarkCompileLodashWithCodeCache-16    	    2881	    405461 ns/op	1341.92 MB/s	      16 B/op	       1 allocs/op
+BenchmarkStartupWithLodash-16             	     307	   3793009 ns/op	     304 B/op	      13 allocs/op
+BenchmarkJSRegex-16                       	   39636	     32644 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSObjects-16                     	    2940	    536264 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSArrays-16                      	     296	   4004396 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSStrings-16                     	    2596	    441729 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSJSON-16                        	    2062	    551438 ns/op	      16 B/op	       1 allocs/op
+BenchmarkHeapPerIsolate-16                	    1255	   1041216 ns/op	    191444 heapB/iso	     272 B/op	      11 allocs/op
+BenchmarkHeapPerContext-16                	     187	   6394807 ns/op	     88345 heapB/ctx	    4976 B/op	     305 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	37.678s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     13146 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	1.528s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkNewIsolate-16                    	    1460	    836227 ns/op	     176 B/op	       5 allocs/op
+BenchmarkNewContext-16                    	    9894	    115508 ns/op	      80 B/op	       5 allocs/op
+BenchmarkRunScriptTrivial-16              	 1717038	       694.1 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16                  	 1642958	       734.0 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16              	    3727	    309870 ns/op	  130999 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16       	    3196	    358102 ns/op	  131078 B/op	    2752 allocs/op
+BenchmarkNewValueString-16                	 4053873	       295.5 ns/op	      32 B/op	       2 allocs/op
+BenchmarkValueToGoString-16               	  758830	      1437 ns/op	     272 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16                  	 1420111	       874.8 ns/op	      36 B/op	       3 allocs/op
+BenchmarkJSONParse-16                     	   43088	     24311 ns/op	 617.04 MB/s	      16 B/op	       1 allocs/op
+BenchmarkJSONStringify-16                 	   37662	     27370 ns/op	 548.09 MB/s	   16384 B/op	       1 allocs/op
+BenchmarkCompileLodashCold-16             	     522	   2352852 ns/op	 231.25 MB/s	    2119 B/op	       1 allocs/op
+BenchmarkCompileLodashWithCodeCache-16    	    2950	    412285 ns/op	1319.71 MB/s	      16 B/op	       1 allocs/op
+BenchmarkStartupWithLodash-16             	     314	   3862730 ns/op	     304 B/op	      13 allocs/op
+BenchmarkJSRegex-16                       	   36717	     32804 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSObjects-16                     	    3237	    524556 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSArrays-16                      	     295	   3991877 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSStrings-16                     	    2629	    444247 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSJSON-16                        	    2092	    555090 ns/op	      16 B/op	       1 allocs/op
+BenchmarkHeapPerIsolate-16                	    1225	    993987 ns/op	    191444 heapB/iso	     272 B/op	      11 allocs/op
+BenchmarkHeapPerContext-16                	     188	   6386233 ns/op	     88345 heapB/ctx	    4976 B/op	     305 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	38.393s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     13132 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	1.546s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkNewIsolate-16                    	    1364	    824909 ns/op	     176 B/op	       5 allocs/op
+BenchmarkNewContext-16                    	    8692	    122132 ns/op	      80 B/op	       5 allocs/op
+BenchmarkRunScriptTrivial-16              	 1740152	       697.5 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16                  	 1629430	       737.6 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16              	    3705	    314652 ns/op	  130998 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16       	    3318	    357384 ns/op	  131077 B/op	    2752 allocs/op
+BenchmarkNewValueString-16                	 4025895	       298.8 ns/op	      32 B/op	       2 allocs/op
+BenchmarkValueToGoString-16               	  760806	      1422 ns/op	     272 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16                  	 1423914	       837.4 ns/op	      36 B/op	       3 allocs/op
+BenchmarkJSONParse-16                     	   48128	     24190 ns/op	 620.13 MB/s	      16 B/op	       1 allocs/op
+BenchmarkJSONStringify-16                 	   46051	     26699 ns/op	 561.87 MB/s	   16384 B/op	       1 allocs/op
+BenchmarkCompileLodashCold-16             	     500	   2309447 ns/op	 235.60 MB/s	    2212 B/op	       1 allocs/op
+BenchmarkCompileLodashWithCodeCache-16    	    2683	    410532 ns/op	1325.35 MB/s	      16 B/op	       1 allocs/op
+BenchmarkStartupWithLodash-16             	     309	   3899204 ns/op	     304 B/op	      13 allocs/op
+BenchmarkJSRegex-16                       	   37206	     33061 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSObjects-16                     	    7336	    156421 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSArrays-16                      	     297	   3936912 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSStrings-16                     	    2409	    425976 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSJSON-16                        	    2102	    556191 ns/op	      16 B/op	       1 allocs/op
+BenchmarkHeapPerIsolate-16                	    1224	    995204 ns/op	    191444 heapB/iso	     272 B/op	      11 allocs/op
+BenchmarkHeapPerContext-16                	     188	   6294470 ns/op	     88345 heapB/ctx	    4976 B/op	     305 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	36.750s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     13133 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	1.558s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkNewIsolate-16                    	    1429	    863310 ns/op	     176 B/op	       5 allocs/op
+BenchmarkNewContext-16                    	    8790	    121666 ns/op	      80 B/op	       5 allocs/op
+BenchmarkRunScriptTrivial-16              	 1722356	       688.9 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16                  	 1639287	       729.0 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16              	    3770	    316580 ns/op	  130999 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16       	    2919	    353471 ns/op	  131078 B/op	    2752 allocs/op
+BenchmarkNewValueString-16                	 4029686	       293.0 ns/op	      32 B/op	       2 allocs/op
+BenchmarkValueToGoString-16               	  730761	      1407 ns/op	     272 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16                  	 1420274	       830.8 ns/op	      36 B/op	       3 allocs/op
+BenchmarkJSONParse-16                     	   44686	     26824 ns/op	 559.25 MB/s	      16 B/op	       1 allocs/op
+BenchmarkJSONStringify-16                 	   42952	     28905 ns/op	 518.97 MB/s	   16384 B/op	       1 allocs/op
+BenchmarkCompileLodashCold-16             	     488	   2351466 ns/op	 231.39 MB/s	    2266 B/op	       1 allocs/op
+BenchmarkCompileLodashWithCodeCache-16    	    2877	    410863 ns/op	1324.28 MB/s	      16 B/op	       1 allocs/op
+BenchmarkStartupWithLodash-16             	     314	   3857341 ns/op	     304 B/op	      13 allocs/op
+BenchmarkJSRegex-16                       	   38046	     33661 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSObjects-16                     	    7352	    180908 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSArrays-16                      	     294	   4012843 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSStrings-16                     	    2653	    443650 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSJSON-16                        	    2007	    552772 ns/op	      16 B/op	       1 allocs/op
+BenchmarkHeapPerIsolate-16                	    1196	    981422 ns/op	    191444 heapB/iso	     272 B/op	      11 allocs/op
+BenchmarkHeapPerContext-16                	     189	   6440180 ns/op	     88345 heapB/ctx	    4976 B/op	     305 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	37.433s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     13252 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	1.540s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkNewIsolate-16                    	    1460	    845857 ns/op	     176 B/op	       5 allocs/op
+BenchmarkNewContext-16                    	    8823	    119376 ns/op	      80 B/op	       5 allocs/op
+BenchmarkRunScriptTrivial-16              	 1736792	       688.1 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16                  	 1606983	       759.7 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16              	    3867	    305681 ns/op	  130999 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16       	    3162	    353267 ns/op	  131077 B/op	    2752 allocs/op
+BenchmarkNewValueString-16                	 4092603	       290.9 ns/op	      32 B/op	       2 allocs/op
+BenchmarkValueToGoString-16               	  751098	      1403 ns/op	     272 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16                  	 1436560	       844.3 ns/op	      36 B/op	       3 allocs/op
+BenchmarkJSONParse-16                     	   48902	     24053 ns/op	 623.66 MB/s	      16 B/op	       1 allocs/op
+BenchmarkJSONStringify-16                 	   45476	     26283 ns/op	 570.75 MB/s	   16384 B/op	       1 allocs/op
+BenchmarkCompileLodashCold-16             	     513	   2378881 ns/op	 228.72 MB/s	    2156 B/op	       1 allocs/op
+BenchmarkCompileLodashWithCodeCache-16    	    2995	    407499 ns/op	1335.21 MB/s	      16 B/op	       1 allocs/op
+BenchmarkStartupWithLodash-16             	     319	   3736909 ns/op	     304 B/op	      13 allocs/op
+BenchmarkJSRegex-16                       	   37600	     33409 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSObjects-16                     	    7470	    517446 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSArrays-16                      	     294	   3967071 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSStrings-16                     	    2668	    422783 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSJSON-16                        	    2066	    555285 ns/op	      16 B/op	       1 allocs/op
+BenchmarkHeapPerIsolate-16                	    1239	    964304 ns/op	    191444 heapB/iso	     272 B/op	      11 allocs/op
+BenchmarkHeapPerContext-16                	     188	   6363912 ns/op	     88345 heapB/ctx	    4976 B/op	     305 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	39.979s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     13367 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	1.570s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkNewIsolate-16                    	    1434	    844898 ns/op	     176 B/op	       5 allocs/op
+BenchmarkNewContext-16                    	    8660	    122276 ns/op	      80 B/op	       5 allocs/op
+BenchmarkRunScriptTrivial-16              	 1745787	       688.2 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16                  	 1634895	       742.5 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16              	    3722	    316687 ns/op	  130998 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16       	    3242	    358955 ns/op	  131077 B/op	    2752 allocs/op
+BenchmarkNewValueString-16                	 4058216	       295.4 ns/op	      32 B/op	       2 allocs/op
+BenchmarkValueToGoString-16               	  722559	      1414 ns/op	     272 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16                  	 1436318	       853.7 ns/op	      36 B/op	       3 allocs/op
+BenchmarkJSONParse-16                     	   47391	     24224 ns/op	 619.25 MB/s	      16 B/op	       1 allocs/op
+BenchmarkJSONStringify-16                 	   45744	     26293 ns/op	 570.54 MB/s	   16384 B/op	       1 allocs/op
+BenchmarkCompileLodashCold-16             	     504	   2309552 ns/op	 235.59 MB/s	    2194 B/op	       1 allocs/op
+BenchmarkCompileLodashWithCodeCache-16    	    2948	    405993 ns/op	1340.17 MB/s	      16 B/op	       1 allocs/op
+BenchmarkStartupWithLodash-16             	     316	   3838689 ns/op	     304 B/op	      13 allocs/op
+BenchmarkJSRegex-16                       	   36469	     38578 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSObjects-16                     	    6334	    400397 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSArrays-16                      	     290	   3967804 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSStrings-16                     	    2548	    430887 ns/op	      16 B/op	       1 allocs/op
+BenchmarkJSJSON-16                        	    1970	    555869 ns/op	      16 B/op	       1 allocs/op
+BenchmarkHeapPerIsolate-16                	    1177	    984371 ns/op	    191444 heapB/iso	     272 B/op	      11 allocs/op
+BenchmarkHeapPerContext-16                	     189	   6267448 ns/op	     88345 heapB/ctx	    4976 B/op	     305 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	38.121s
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     13657 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/botify-labs/v8go/bench	1.548s

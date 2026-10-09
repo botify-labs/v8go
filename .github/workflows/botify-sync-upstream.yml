@@ -1,0 +1,77 @@
+name: Botify Sync Upstream
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: tommie/v8go commit (default master)
+        required: false
+  schedule:
+  - cron: '0 6 * * 1' # Mondays
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+    - uses: actions/checkout@v7
+    - name: Resolve tommie commit
+      id: sha
+      env:
+        INPUT_SHA: ${{ inputs.sha }}
+      run: |
+        sha="$INPUT_SHA"
+        [ -n "$sha" ] || sha=$(git ls-remote https://github.com/tommie/v8go.git refs/heads/master | cut -f1)
+        [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "not a full commit sha: '$sha'" >&2; exit 1; }
+        echo "sha=$sha" >>"$GITHUB_OUTPUT"
+    # Skips a commit already imported, and one whose sync branch already exists
+    # (its PR is open, or merged without deleting the branch): the weekly run
+    # would otherwise have create-pull-request force-update the branch with a
+    # fresh import, wiping the bridge and pin commits pushed on it since. To
+    # redo a sync from scratch, delete its branch (closing the PR) first.
+    - name: Skip if already imported or being imported
+      id: check
+      env:
+        SHA: ${{ steps.sha.outputs.sha }}
+      run: |
+        if [ "$(cat deps/tommie_sha)" = "$SHA" ]; then
+          echo "tommie/v8go@$SHA is already imported"
+          echo "skip=true" >>"$GITHUB_OUTPUT"
+          exit 0
+        fi
+        # --exit-code: 2 when no such branch; any other failure stops the run.
+        rc=0
+        git ls-remote --exit-code --heads origin "refs/heads/sync/tommie-$SHA" >/dev/null || rc=$?
+        case $rc in
+        0) echo "sync/tommie-$SHA already exists: not overwriting it"
+           echo "skip=true" >>"$GITHUB_OUTPUT" ;;
+        2) ;;
+        *) echo "git ls-remote failed ($rc)" >&2; exit 1 ;;
+        esac
+    - uses: actions/setup-go@v7
+      if: steps.check.outputs.skip != 'true'
+      with:
+        go-version: '1.27'
+    - name: Install llvm (llvm-ar, llvm-ranlib, llvm-nm and llvm-objcopy strip the allocator shim and rename the C++ runtime)
+      if: steps.check.outputs.skip != 'true'
+      run: sudo apt-get update && sudo apt-get install -y llvm
+    - name: Import
+      if: steps.check.outputs.skip != 'true'
+      run: tools/sync_tommie.sh "${{ steps.sha.outputs.sha }}"
+    - uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
+      if: steps.check.outputs.skip != 'true'
+      with:
+        branch: sync/tommie-${{ steps.sha.outputs.sha }}
+        title: Sync tommie/v8go@${{ steps.sha.outputs.sha }}
+        commit-message: Import tommie/v8go@${{ steps.sha.outputs.sha }}
+        body: |
+          Automated import by tools/sync_tommie.sh. go.mod keeps Botify's pins of the deps/* modules (the previous bridges).
+          1. Run the "Botify Bridge" workflow on this branch (this workflow's commit triggers no other workflow). It commits "Rebuild prebuilt v8go bridges" when the bridges are stale; a sync that changes no bridge input gets no bridge commit.
+          2. Then, on this branch: tools/pin_deps.sh <full sha of the bridge commit>, or of the import commit itself when there is no bridge commit; commit go.mod, go.sum and bench/go.mod, and push (that push triggers Botify CI) (BOTIFY.md).
+          3. Botify CI must pass, pinned-deps-fresh included: consumer and source tests on 5 targets, LeakSanitizer, Cleanup soak.
+          4. Squash-merge, replacing the squash commit message with the PR title and a short body, then re-pin on master's commit (BOTIFY.md, "Commits épinglés et squash" and "Publier une version").

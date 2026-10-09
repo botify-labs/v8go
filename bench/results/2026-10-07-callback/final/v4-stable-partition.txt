@@ -1,0 +1,170 @@
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkRunScriptTrivial-16           	 1746842	       683.1 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16               	 1586401	       747.7 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16           	    3702	    319948 ns/op	  130998 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16    	    2881	    368764 ns/op	  131077 B/op	    2752 allocs/op
+BenchmarkNewValueString-16             	 3680662	       308.4 ns/op	      32 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16               	 1398505	       864.6 ns/op	      36 B/op	       3 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     14205 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkRunScriptTrivial-16           	 1609039	       763.2 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16               	 1442206	       805.5 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16           	    2955	    412692 ns/op	  131001 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16    	    2772	    442819 ns/op	  131080 B/op	    2752 allocs/op
+BenchmarkNewValueString-16             	 3274243	       345.4 ns/op	      32 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16               	 1319602	       932.9 ns/op	      36 B/op	       3 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     15215 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkRunScriptTrivial-16           	 1535139	       768.2 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16               	 1346260	       884.4 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16           	    2910	    387596 ns/op	  131000 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16    	    2786	    399985 ns/op	  131079 B/op	    2752 allocs/op
+BenchmarkNewValueString-16             	 3399493	       332.5 ns/op	      32 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16               	 1340884	       896.6 ns/op	      36 B/op	       3 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     14576 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkRunScriptTrivial-16           	 1647304	       732.5 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16               	 1428561	       787.1 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16           	    2762	    404817 ns/op	  130999 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16    	    2850	    526851 ns/op	  131079 B/op	    2752 allocs/op
+BenchmarkNewValueString-16             	 3481275	       326.2 ns/op	      32 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16               	 1314610	       888.5 ns/op	      36 B/op	       3 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     15197 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkRunScriptTrivial-16           	 1586642	       723.5 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16               	 1523516	       839.0 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16           	    2938	    371488 ns/op	  131004 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16    	    2638	    416120 ns/op	  131079 B/op	    2752 allocs/op
+BenchmarkNewValueString-16             	 3241894	       348.0 ns/op	      32 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16               	 1352852	       878.5 ns/op	      36 B/op	       3 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     14604 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkRunScriptTrivial-16           	 1593510	       713.1 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16               	 1451392	       813.7 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16           	    2828	    394359 ns/op	  131001 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16    	    2918	    403492 ns/op	  131082 B/op	    2752 allocs/op
+BenchmarkNewValueString-16             	 3584151	       326.8 ns/op	      32 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16               	 1332475	       886.3 ns/op	      36 B/op	       3 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     14794 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkRunScriptTrivial-16           	 1575157	       728.2 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16               	 1477334	       769.7 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16           	    2833	    397308 ns/op	  131000 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16    	    2707	    410047 ns/op	  131080 B/op	    2752 allocs/op
+BenchmarkNewValueString-16             	 3445062	       356.2 ns/op	      32 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16               	 1315932	       910.7 ns/op	      36 B/op	       3 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     14720 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkRunScriptTrivial-16           	 1544442	       759.5 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16               	 1464420	       826.8 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16           	    2910	    406059 ns/op	  130999 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16    	    2703	    412735 ns/op	  131080 B/op	    2752 allocs/op
+BenchmarkNewValueString-16             	 3342255	       347.7 ns/op	      32 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16               	 1330999	       912.8 ns/op	      36 B/op	       3 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     14957 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkRunScriptTrivial-16           	 1572374	       736.6 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16               	 1510341	       858.8 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16           	    2992	    388399 ns/op	  131001 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16    	    3114	    415943 ns/op	  131082 B/op	    2752 allocs/op
+BenchmarkNewValueString-16             	 3594145	       318.4 ns/op	      32 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16               	 1327008	       889.3 ns/op	      36 B/op	       3 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     15117 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkRunScriptTrivial-16           	 1604658	       704.9 ns/op	      16 B/op	       1 allocs/op
+BenchmarkCallJSFromGo-16               	 1491585	       779.2 ns/op	      68 B/op	       5 allocs/op
+BenchmarkCallGoFromJS1000-16           	    2988	    376135 ns/op	  131002 B/op	    2746 allocs/op
+BenchmarkCallGoFromJS1000Cleanup-16    	    3096	    399293 ns/op	  131080 B/op	    2752 allocs/op
+BenchmarkNewValueString-16             	 3598303	       342.5 ns/op	      32 B/op	       2 allocs/op
+BenchmarkObjectSetGet-16               	 1278438	       958.7 ns/op	      36 B/op	       3 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/botify-labs/v8go/bench
+cpu: Intel(R) Core(TM) Ultra 9 285H
+BenchmarkCleanup1000Values-16    	    2000	     15165 ns/op	       0 B/op	       0 allocs/op
+PASS
