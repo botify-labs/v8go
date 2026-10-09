@@ -195,7 +195,11 @@ affichés (ceux de `botify-ci.yml`) :
   `Fully static binary with g++ C++ code on linux arm64` (`static-cxx-probe`) ;
 - éventuellement `LeakSanitizer (source mode)` et `Cleanup soak (consumer mode)`.
 
-## Publier une version (ex. v0.10.0)
+## Publier une version (ex. v0.15.4)
+
+Numérotation : `v0.<majeure de V8>.<mineure de V8>` (`v0.15.4` pour V8 15.4). Le module reste en
+v0 : une version majeure ≥ 2 imposerait le chemin `github.com/botify-labs/v8go/vN` (versionnage
+sémantique des imports de Go), donc un changement d'import chez chaque consommateur.
 
 1. **PR verte, squash-merge** : `botify-ci` passe sur la PR, `pinned-deps-fresh` compris ; la
    fusionner en squash, en **remplaçant le message proposé** par le titre de la PR et un corps court
@@ -213,23 +217,23 @@ affichés (ceux de `botify-ci.yml`) :
    ```sh
    git fetch origin && S=$(git rev-parse origin/master)
    for d in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64; do
-     git tag "deps/$d/v0.10.0" "$S"
-     git push origin "refs/tags/deps/$d/v0.10.0"
+     git tag "deps/$d/v0.15.4" "$S"
+     git push origin "refs/tags/deps/$d/v0.15.4"
    done
    ```
 
    Jamais `git push --tags` : un clone local peut contenir les tags v0.7.0 à v0.9.0 de rogchap/v8go,
    absents de ce dépôt, qui seraient publiés avec.
 3. **Épingler les tags** : sur une branche partant de S,
-   `tools/docker/dev.sh 'tools/pin_deps.sh v0.10.0'` (le script vérifie
-   `deps/<os>_<arch>/v0.10.0` pour chaque module, et que son arbre est celui de HEAD), committer
+   `tools/docker/dev.sh 'tools/pin_deps.sh v0.15.4'` (le script vérifie
+   `deps/<os>_<arch>/v0.15.4` pour chaque module, et que son arbre est celui de HEAD), committer
    `go.mod`, `go.sum`, `bench/go.mod`, et, dans la même PR, dater l'entrée de la version dans
-   `CHANGELOG.md` (`### [v0.10.0] - unreleased` devient `### [v0.10.0] - <date du tag>`) ; ouvrir
+   `CHANGELOG.md` (`### [v0.15.4] - unreleased` devient `### [v0.15.4] - <date du tag>`) ; ouvrir
    la PR, attendre `botify-ci` (dont `pinned-deps-fresh`), fusionner : commit **P** sur master. Le
    pin ne touche pas au C++ : le bridge n'est pas reconstruit.
-4. **Tagger le module racine sur P** : `git tag v0.10.0 <P> && git push origin refs/tags/v0.10.0`.
+4. **Tagger le module racine sur P** : `git tag v0.15.4 <P> && git push origin refs/tags/v0.15.4`.
 
-Les consommateurs requièrent `github.com/botify-labs/v8go v0.10.0`, qui épingle les modules `deps/*`
+Les consommateurs requièrent `github.com/botify-labs/v8go v0.15.4`, qui épingle les modules `deps/*`
 à leurs tags : tout reste accessible indépendamment des branches.
 
 ## Mettre à jour V8

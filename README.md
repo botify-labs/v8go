@@ -12,7 +12,7 @@
 `rogchap.com/v8go` (V8 9.0): see [MIGRATION.md](MIGRATION.md).
 
 ```sh
-go get github.com/botify-labs/v8go@v0.10.0   # once v0.10.0 is released (CHANGELOG.md)
+go get github.com/botify-labs/v8go@v0.15.4
 ```
 
 ## Requirements

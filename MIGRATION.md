@@ -5,10 +5,11 @@
 ```diff
 -replace rogchap.com/v8go => github.com/botify-labs/v8go v0.0.0-20211129082619-6f9829d18985
 -require rogchap.com/v8go v0.6.1-0.20211110211436-d8d94c25bd2b
-+require github.com/botify-labs/v8go v0.10.0
++require github.com/botify-labs/v8go v0.15.4
 ```
 
-(`v0.10.0` une fois publiée, voir `CHANGELOG.md` ; d'ici là, une pseudo-version de la branche.)
+(Les versions suivent la version de V8 en mineure et patch : `v0.15.4` pour V8 15.4. Une version
+majeure ≥ 2 imposerait un chemin de module en `/vN`.)
 
 ```diff
 -import "rogchap.com/v8go"
