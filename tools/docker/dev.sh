@@ -5,7 +5,7 @@
 # named v8go, /src/<name> for a worktree or a second clone). The V8 9.0
 # baseline that bench/ compares with is expected in /src/v8go-baseline.
 # Usage: tools/docker/dev.sh '<command>'
-# Forwarded when set: COUNT and SOAK_ITERATIONS (bench/run.sh).
+# Forwarded when set: COUNT, SOAK_ITERATIONS and SOAK_DURATION (bench/run.sh).
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -19,7 +19,7 @@ exec docker run --rm -i \
   -v "$PARENT:/src" \
   -v v8go-gomod:/go/pkg/mod \
   -v v8go-gocache:/root/.cache/go-build \
-  -e COUNT -e SOAK_ITERATIONS \
+  -e COUNT -e SOAK_ITERATIONS -e SOAK_DURATION \
   -e "V8GO_DIR=/src/$NAME" \
   -w "/src/$NAME" \
   v8go-dev bash -lc "$*"

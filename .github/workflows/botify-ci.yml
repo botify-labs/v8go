@@ -221,4 +221,6 @@ jobs:
       run: |
         # bench/go.mod replaces the baseline module; only -tags v8baseline imports it.
         mkdir -p ../../v8go-baseline && printf 'module rogchap.com/v8go\n\ngo 1.16\n' >../../v8go-baseline/go.mod
-        SOAK_ITERATIONS=30000 GOWORK=off CC=gcc go test -tags soak -run TestSoakCleanup -v -timeout 1h .
+        # A duration, not an iteration count: V8's memory reducer (>= 8 s timer)
+        # must fire for RSS to plateau, whatever the runner's speed.
+        SOAK_DURATION=25s GOWORK=off CC=gcc go test -tags soak -run TestSoakCleanup -v -timeout 1h .
