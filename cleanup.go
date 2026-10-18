@@ -95,3 +95,23 @@ func (i *Isolate) internalRetainedValueCount() int {
 func (i *Isolate) internalUnboundScriptCount() int {
 	return int(C.IsolateInternalUnboundScriptCount(i.ptr))
 }
+
+// Retain keeps u, a script compiled by Isolate.CompileUnboundScript, past
+// Isolate.Cleanup, which otherwise releases it: it can run again in the next
+// contexts without being compiled again. It stays until Release or the
+// Isolate's Dispose, and must not be used after either.
+func (u *UnboundScript) Retain() {
+	C.UnboundScriptRetain(u.iso.ptr, u.ptr)
+}
+
+// Release frees u, kept by Retain, at once. It does nothing on a script Retain
+// did not keep, which Isolate.Cleanup frees. It must not be called after the
+// Isolate's Dispose, which frees the scripts it kept.
+func (u *UnboundScript) Release() {
+	if u.ptr == nil {
+		return
+	}
+	if C.UnboundScriptRelease(u.iso.ptr, u.ptr) != 0 {
+		u.ptr = nil
+	}
+}

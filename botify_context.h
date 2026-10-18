@@ -36,9 +36,14 @@ inline m_ctx* BotifyContextGet(v8::Isolate* iso,
       iso, kBotifyContextIndex, v8::kEmbedderDataTypeTagDefault));
 }
 
+// Drops ctx's unbound scripts from the ones ContextCleanup keeps (cleanup.cc),
+// before ContextFree frees them.
+void BotifyRetainedScriptsForget(m_ctx* ctx);
+
 // Clears the pointer BotifyContextSet stored, before ContextFree frees ctx.
 // The Isolate's internal context isn't created by NewContext, and has none.
 inline void BotifyContextForget(m_ctx* ctx) {
+  BotifyRetainedScriptsForget(ctx);
   v8::Isolate* iso = ctx->iso;
   if (ctx->ptr.IsEmpty() || iso->GetData(0) == ctx) {
     return;

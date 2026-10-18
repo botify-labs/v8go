@@ -6,7 +6,11 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
 - **Bridge précompilé** : les `.cc` ne sont compilés qu'avec `-tags v8go_source`. Les consommateurs
   lient `deps/<os>_<arch>/libv8go.a` (`v8go.lib` sous Windows), produit par `tools/build_bridge.sh`.
   `tools/check_bridge.sh` vérifie qu'il correspond aux sources.
-- `cleanup.*` : `Isolate.Cleanup()` / `Context.Cleanup()`. `Isolate.Cleanup()` exécute les tâches
+- `cleanup.*` : `Isolate.Cleanup()` / `Context.Cleanup()`.
+  `UnboundScript.Retain()` soustrait un script à `Isolate.Cleanup()` jusqu'à `UnboundScript.Release()`
+  ou `Dispose` : il reste dans la liste du contexte interne (que `ContextFree` libère), et un
+  ensemble global, vidé par `BotifyContextForget` avant cette libération, dit à `ContextCleanup` de
+  le garder. `Isolate.Cleanup()` exécute les tâches
   que V8 a postées pour l'isolate (GC, memory reducer, tâches qui règlent des promesses : compilation
   wasm, `Atomics.waitAsync`), sans jamais exécuter de JS ni de callback Go : chaque tâche est
   précédée d'une demande de terminaison, le JS qu'elle lancerait (callbacks `FinalizationRegistry`)

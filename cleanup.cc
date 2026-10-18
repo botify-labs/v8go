@@ -4,7 +4,10 @@
 
 #include "cleanup.h"
 
+#include <algorithm>
 #include <memory>
+#include <mutex>
+#include <unordered_set>
 
 #include "deps/include/libplatform/libplatform.h"
 #include "deps/include/v8-locker.h"
@@ -26,6 +29,14 @@ using namespace v8;
 extern std::unique_ptr<Platform> default_platform;
 
 constinit thread_local Isolate* botify_cleanup_isolate = nullptr;
+
+// The unbound scripts that ContextCleanup keeps (UnboundScriptRetain). They
+// stay in their context's unboundScripts, so ContextFree still frees them
+// with the context; BotifyRetainedScriptsForget drops them from the set
+// before, so that a later script allocated at the same address is not kept.
+// One set for all the isolates, which may clean up on different threads.
+static std::mutex retained_scripts_mu;
+static std::unordered_set<m_unboundScript*> retained_scripts;
 
 // Upper bound on the tasks one Cleanup runs. Some V8 tasks re-arm themselves
 // (e.g. GC jobs posting their next step), so draining until the queue is
@@ -144,11 +155,48 @@ void ContextCleanup(ContextPtr ctx) {
                          delete val;
                        });
 
-  for (m_unboundScript* us : ctx->unboundScripts) {
-    us->ptr.Reset();
-    delete us;
+  std::vector<m_unboundScript*> kept;
+  {
+    std::lock_guard<std::mutex> lock(retained_scripts_mu);
+    for (m_unboundScript* us : ctx->unboundScripts) {
+      if (retained_scripts.count(us) != 0) {
+        kept.push_back(us);
+        continue;
+      }
+      us->ptr.Reset();
+      delete us;
+    }
   }
-  ctx->unboundScripts.clear();
+  ctx->unboundScripts.swap(kept);
+}
+
+void UnboundScriptRetain(IsolatePtr iso, UnboundScriptPtr us) {
+  (void)iso;
+  std::lock_guard<std::mutex> lock(retained_scripts_mu);
+  retained_scripts.insert(us);
+}
+
+int UnboundScriptRelease(IsolatePtr iso, UnboundScriptPtr us) {
+  Locker locker(iso);
+  Isolate::Scope isolate_scope(iso);
+  {
+    std::lock_guard<std::mutex> lock(retained_scripts_mu);
+    if (retained_scripts.erase(us) == 0) {
+      return 0;
+    }
+  }
+  auto& scripts = isolateInternalContext(iso)->unboundScripts;
+  scripts.erase(std::remove(scripts.begin(), scripts.end(), us), scripts.end());
+  us->ptr.Reset();
+  delete us;
+  return 1;
+}
+
+void BotifyRetainedScriptsForget(m_ctx* ctx) {
+  std::lock_guard<std::mutex> lock(retained_scripts_mu);
+  for (m_unboundScript* us : ctx->unboundScripts) {
+    retained_scripts.erase(us);
+  }
 }
 
 int IsolateCleanup(IsolatePtr iso) {
