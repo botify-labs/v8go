@@ -42,6 +42,16 @@ extern void IsolateResetHeapLimitReached(IsolatePtr iso);
 extern void IsolateResetHeapLimitRaised(IsolatePtr iso);
 extern int IsolateInternalUnboundScriptCount(IsolatePtr iso);
 
+typedef struct m_unboundScript m_unboundScript;
+typedef m_unboundScript* UnboundScriptPtr;
+
+// UnboundScriptRetain makes ContextCleanup keep us, a script of the
+// isolate's internal context (IsolateCompileUnboundScript), until
+// UnboundScriptRelease or the isolate's disposal. UnboundScriptRelease frees
+// a script so kept and returns 1, and does nothing on any other one (0).
+extern void UnboundScriptRetain(IsolatePtr iso, UnboundScriptPtr us);
+extern int UnboundScriptRelease(IsolatePtr iso, UnboundScriptPtr us);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

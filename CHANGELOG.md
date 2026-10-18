@@ -14,6 +14,13 @@ lists every change in detail.
 
 ## Botify releases
 
+### [Unreleased]
+
+#### Added
+- `UnboundScript.Retain` and `UnboundScript.Release`: a script compiled by
+  `Isolate.CompileUnboundScript` and retained stays past `Isolate.Cleanup`, until `Release` or the
+  isolate's `Dispose`, so that it runs again in the next contexts without being compiled again.
+
 ### [v0.15.4] - 2026-10-09
 
 First release of the module `github.com/botify-labs/v8go`, replacing the Botify fork of
