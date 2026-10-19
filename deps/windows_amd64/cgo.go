@@ -6,7 +6,7 @@ package windows_amd64
 // #cgo linux,v8go_source LDFLAGS: -lv8go_cxxalias
 // #cgo !v8go_source LDFLAGS: -lv8go
 // #cgo !windows LDFLAGS: -pthread
-// #cgo LDFLAGS: -lv8-0 -lv8-1 -lv8-2 -lv8-3 -lv8-4 -lv8-5 -lv8-6 -lc++-cr -llibcmt -llibvcruntime -llibucrt -loldnames -ldbghelp -lwinmm -lshlwapi -ladvapi32
+// #cgo LDFLAGS: -lv8-0 -lv8-1 -lv8-2 -lv8-3 -lv8-4 -lv8-5 -lv8-6 -lv8-7 -lc++-cr -llibcmt -llibvcruntime -llibucrt -loldnames -ldbghelp -lwinmm -lshlwapi -ladvapi32
 // #cgo linux,!v8go_source LDFLAGS: -lm
 // #cgo libgcompat LDFLAGS: -lgcompat
 // #cgo linux LDFLAGS: -ldl
