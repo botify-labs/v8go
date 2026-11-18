@@ -200,7 +200,9 @@ affichés (ceux de `botify-ci.yml`) :
 
 ## Publier une version (ex. v0.15.4)
 
-Numérotation : `v0.<majeure de V8>.<mineure de V8>` (`v0.15.4` pour V8 15.4). Le module reste en
+Numérotation : `v0.<majeure de V8>.<mineure de V8>` (`v0.15.4` pour V8 15.4). Un correctif sans
+changement de V8 incrémente le dernier chiffre, qui dépasse alors la mineure de V8 (`v0.15.5`, encore
+V8 15.4 : voir `CHANGELOG.md`). Le module reste en
 v0 : une version majeure ≥ 2 imposerait le chemin `github.com/botify-labs/v8go/vN` (versionnage
 sémantique des imports de Go), donc un changement d'import chez chaque consommateur.
 
