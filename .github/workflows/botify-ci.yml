@@ -78,7 +78,7 @@ jobs:
         - { os: linux, arch: amd64, platform: ubuntu-24.04, consumer_cc: gcc, race: -race }
         - { os: linux, arch: arm64, platform: ubuntu-24.04-arm, consumer_cc: gcc, race: -race }
         - { os: darwin, arch: amd64, platform: macos-15-intel, consumer_cc: /usr/bin/clang, race: -race }
-        - { os: darwin, arch: arm64, platform: macos-15, consumer_cc: /usr/bin/clang, race: -race }
+        - { os: darwin, arch: arm64, platform: macos-26, consumer_cc: /usr/bin/clang, race: -race }
         - { os: windows, arch: amd64, platform: windows-latest, consumer_cc: 'clang -fuse-ld=lld', race: -race }
     runs-on: ${{ matrix.platform }}
     defaults:
