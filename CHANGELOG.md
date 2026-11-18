@@ -14,7 +14,7 @@ lists every change in detail.
 
 ## Botify releases
 
-### [Unreleased]
+### [v0.15.5] - 2026-11-18
 
 #### Fixed
 - Linux builds fail with Go 1.26.11, 1.27.4 or newer: `invalid linker input file in #cgo LDFLAGS:
