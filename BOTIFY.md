@@ -57,8 +57,11 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
 
   `tools/build_bridge.sh` renomme de même les bridges Linux, et la table et les deux
   scripts (`build_bridge.sh`, `rename_cxx_runtime.sh`) entrent dans `tools/bridge_hash.sh`. Mode source : les objets compilés par cgo référencent les noms d'origine ;
-  `deps/linux_*/libv8go_cxxalias.a` (un script d'édition de liens généré, lié avant les archives en
-  mode source seulement) les définit comme alias des noms renommés (`EXTERN` + `PROVIDE`), et
+  `deps/linux_*/v8go_cxxalias.ld` (un script d'édition de liens généré) les définit comme alias des
+  noms renommés (`EXTERN` + `PROVIDE`). Le mode source le passe par son chemin dans `CGO_LDFLAGS`
+  (`CGO_LDFLAGS=$PWD/deps/linux_$(go env GOARCH)/v8go_cxxalias.ld`), qui précède les archives : depuis
+  Go 1.26.11 et 1.27.4, `cmd/go` refuse un script d'édition de liens portant un nom de bibliothèque
+  (`lib*.a`) dans un répertoire `-L` d'une directive `#cgo`, même en mode consommateur. Et
   `botify_cxxalias_linux.go` redirige `operator new`/`delete` par `--wrap`, pour qu'ils restent ceux
   de V8 même à côté de ceux d'ASan (`-tags leakcheck`). Preuve : `internal/cxxprobe` (C++ g++ lié avec
   v8go, tag `cxxprobe`), exécuté en lien entièrement statique par le job `static-cxx-probe`.
@@ -72,7 +75,7 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   - sous ASan (`-tags leakcheck`), `operator new`/`delete` de V8 et de v8go passent par ceux de
     libc++abi : la détection des `new`/`delete` non appariés (`alloc-dealloc-mismatch`) est perdue
     pour ce code. LeakSanitizer et les contrôles au niveau de `malloc` ne changent pas ;
-  - les alias (`libv8go_cxxalias.a`) ne sont testés qu'avec GNU ld (le défaut du pilote clang-21) ;
+  - les alias (`v8go_cxxalias.ld`) ne sont testés qu'avec GNU ld (le défaut du pilote clang-21) ;
     lld et gold ne le sont pas.
 - **Chemin JS→Go** (`bench/results/2026-10-07-callback/callback-perf.md`) :
   `botify_values.h` (valeurs suivies par un contexte : vecteur indexé au lieu de

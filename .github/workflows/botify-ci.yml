@@ -102,7 +102,11 @@ jobs:
     - name: Consumer-mode tests (committed bridge, system compiler, no flags)
       run: CC="${{ matrix.consumer_cc }}" CGO_CXXFLAGS= go test ${{ matrix.race }} -count=1 ./...
     - name: Source-mode tests
-      run: go test -tags v8go_source -count=1 ./...
+      run: |
+        if [ "${{ matrix.os }}" = linux ]; then
+          export CGO_LDFLAGS="$PWD/deps/linux_${{ matrix.arch }}/v8go_cxxalias.ld"
+        fi
+        go test -tags v8go_source -count=1 ./...
       env:
         CGO_CXXFLAGS: "-nostdinc++"
 
@@ -207,6 +211,7 @@ jobs:
     - run: go test -c -tags "leakcheck v8go_source" -o v8go.test . && ./v8go.test
       env:
         CGO_CXXFLAGS: "-nostdinc++"
+        CGO_LDFLAGS: ${{ github.workspace }}/deps/linux_amd64/v8go_cxxalias.ld
 
   soak:
     name: Cleanup soak (consumer mode)

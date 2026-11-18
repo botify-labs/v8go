@@ -3,19 +3,21 @@
 # Baseline v8go (V8 9.0) was built with gcc and libstdc++.
 use_baseline() {
   export CC=gcc CXX=g++
-  unset CGO_CXXFLAGS
+  unset CGO_CXXFLAGS CGO_LDFLAGS
 }
 
 # New v8go as consumers build it: system gcc, no flags, prebuilt bridge.
 use_consumer() {
   export CC=gcc CXX=g++
-  unset CGO_CXXFLAGS
+  unset CGO_CXXFLAGS CGO_LDFLAGS
 }
 
 # New v8go from its C++ sources (go build -tags v8go_source, tools/build_bridge.sh):
-# Chromium's libc++ requires clang >= 21 and -nostdinc++.
+# Chromium's libc++ requires clang >= 21 and -nostdinc++, and the link needs
+# the C++ runtime aliases (BOTIFY.md).
 use_source() {
   export CC=clang-21 CXX=clang++-21 CGO_CXXFLAGS=-nostdinc++
+  export CGO_LDFLAGS="$V8GO_DIR/deps/linux_$(go env GOARCH)/v8go_cxxalias.ld"
 }
 
 # This checkout in the container: tools/docker/dev.sh sets V8GO_DIR to

@@ -268,7 +268,9 @@ so it goes in `CGO_CXXFLAGS`:
 CC=clang-21 CXX=clang++-21 CGO_CXXFLAGS=-nostdinc++ go test -tags v8go_source ./...
 ```
 
-These variables apply to every cgo package of the build. On Windows:
+These variables apply to every cgo package of the build. On Linux, the link also needs the linker
+script that aliases V8's renamed C++ runtime (see [BOTIFY.md](BOTIFY.md)), passed by path:
+`CGO_LDFLAGS=$PWD/deps/linux_$(go env GOARCH)/v8go_cxxalias.ld`. On Windows:
 `CC="clang -fuse-ld=lld" CXX="clang++ -fuse-ld=lld" CGO_CXXFLAGS=-nostdinc++`.
 
 The Docker dev image (`tools/docker/dev.sh '<command>'`) has the toolchains (Go, clang 21, gcc,
