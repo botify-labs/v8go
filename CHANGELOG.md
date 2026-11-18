@@ -14,6 +14,11 @@ lists every change in detail.
 
 ## Botify releases
 
+### [Unreleased]
+
+#### Changed
+- Requires Go 1.27.4 or newer (`go 1.27.4` in `go.mod`, was `go 1.19`).
+
 ### [v0.15.5] - 2026-11-18
 
 #### Fixed
