@@ -25,8 +25,9 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   long-lived ne plafonne que grâce au timer du memory reducer de V8 (≥ 8 s) : un soak
   (`bench/soak_test.go`) doit durer assez longtemps pour qu'il se déclenche. Le job `soak` de
   botify-ci le fait tourner 25 s (`SOAK_DURATION=25s`, une durée plutôt qu'un nombre d'itérations : 30 000
-  itérations ne duraient que 6,8 s sur un runner rapide, avant le timer) et vérifie une croissance
-  du RSS ≤ 5 % sur la seconde moitié et un nombre de goroutines stable. Sans `SOAK_DURATION`, le soak
+  itérations ne duraient que 6,8 s sur un runner rapide, avant le timer) et vérifie que la médiane
+  du RSS croît d'au plus 5 % du deuxième quart du run au dernier (les médianes ignorent les creux
+  d'un échantillon du memory reducer), et un nombre de goroutines stable. Sans `SOAK_DURATION`, le soak
   fait `SOAK_ITERATIONS` itérations (100 000 par défaut, ~20 s ; `bench/run.sh soak`).
 - **Allocator shim retiré** : les libs V8 de tommie embarquent l'*allocator shim* de PartitionAlloc,
   qui remplacerait `malloc`/`free`/`new`/`delete` pour tout le processus consommateur (+16 à +40 %

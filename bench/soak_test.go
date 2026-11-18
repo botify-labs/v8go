@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -31,10 +32,18 @@ func rssBytes(tb testing.TB) uint64 {
 	return 0
 }
 
-// growthSecondHalf is the relative growth between the middle and the last sample.
-func growthSecondHalf(samples []uint64) float64 {
-	mid, last := samples[len(samples)/2], samples[len(samples)-1]
-	return float64(last)/float64(mid) - 1
+// growthLastQuarter is the relative growth of the median sample from the
+// second quarter of the run to the last one. Medians ignore the one-sample RSS
+// dips of V8's memory reducer.
+func growthLastQuarter(samples []uint64) float64 {
+	n := len(samples)
+	return float64(median(samples[3*n/4:]))/float64(median(samples[n/4:n/2])) - 1
+}
+
+func median(s []uint64) uint64 {
+	c := slices.Clone(s)
+	slices.Sort(c)
+	return c[len(c)/2]
 }
 
 func soakIterations() int {
@@ -139,11 +148,11 @@ func TestSoakCleanup(t *testing.T) {
 		}
 	}
 
-	g := growthSecondHalf(rss)
-	t.Logf("%s: %d iterations in %s, RSS %d -> %d MiB, second-half growth %.2f%%, V8 heap last %d KiB, Go heap last %d KiB",
+	g := growthLastQuarter(rss)
+	t.Logf("%s: %d iterations in %s, RSS %d -> %d MiB, last-quarter growth %.2f%%, V8 heap last %d KiB, Go heap last %d KiB",
 		Version, len(rss)*1000, time.Since(start).Round(time.Second), rss[0]>>20, rss[len(rss)-1]>>20, g*100, heap[len(heap)-1]>>10, goHeap[len(goHeap)-1]>>10)
 	if g > 0.05 {
-		t.Errorf("RSS grew %.2f%% over the second half (limit 5%%): leak", g*100)
+		t.Errorf("median RSS grew %.2f%% from the second quarter of the run to the last (limit 5%%): leak", g*100)
 	}
 	if n := runtime.NumGoroutine(); n > goroutines+2 {
 		t.Errorf("goroutines grew from %d to %d", goroutines, n)
