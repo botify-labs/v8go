@@ -15,8 +15,14 @@ const heapLimitLoop = `{ const a = []; for (;;) a.push({x: [1, 2, 3]}); }`
 func runTerminated(t *testing.T, iso *v8.Isolate, ctx *v8.Context) error {
 	t.Helper()
 	stop := make(chan struct{})
-	defer close(stop)
+	stopped := make(chan struct{})
+	// The caller may Dispose iso next: TerminateExecution must not race with it.
+	defer func() {
+		close(stop)
+		<-stopped
+	}()
 	go func() {
+		defer close(stopped)
 		for {
 			select {
 			case <-stop:
