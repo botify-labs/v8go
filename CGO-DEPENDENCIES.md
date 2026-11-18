@@ -366,7 +366,7 @@ couche ABI :
 | `tools/rename_cxx_runtime.sh` | l'applique (`objcopy --redefine-syms`) aux archives V8, libc++, compiler-rt et aux bridges Linux ; idempotent |
 | `tools/check_cxx_runtime_isolated.sh` | échoue si une archive Linux définit ou référence un nom d'origine, ou si la table n'est plus à jour |
 | `tools/sync_tommie.sh`, `tools/build_bridge.sh` | appliquent le renommage à chaque import de V8 et à chaque construction de bridge ; la table et les scripts entrent dans l'empreinte des bridges |
-| `deps/linux_*/libv8go_cxxalias.a`, `botify_cxxalias_linux.go` | mode source seulement (`-tags v8go_source`) : alias des noms d'origine pour les objets compilés par cgo (script d'édition de liens et `--wrap` de `operator new`/`delete`) |
+| `deps/linux_*/v8go_cxxalias.ld`, `botify_cxxalias_linux.go` | mode source seulement (`-tags v8go_source`) : alias des noms d'origine pour les objets compilés par cgo (script d'édition de liens et `--wrap` de `operator new`/`delete`) |
 | `internal/cxxprobe`, job `static-cxx-probe` | preuve en CI : C++ g++ et v8go dans un binaire entièrement statique, amd64 et arm64 |
 
 Les deux couches ABI cohabitent sans se voir : chaque runtime lève, attrape et compare ses propres

@@ -14,6 +14,15 @@ lists every change in detail.
 
 ## Botify releases
 
+### [Unreleased]
+
+#### Fixed
+- Linux builds fail with Go 1.26.11, 1.27.4 or newer: `invalid linker input file in #cgo LDFLAGS:
+  .../deps/linux_amd64/libv8go_cxxalias.a (unrecognized binary format)`. Those Go releases reject a
+  linker script named like a library in a `#cgo` `-L` directory. The source-mode linker script is
+  now `deps/linux_*/v8go_cxxalias.ld`, passed in `CGO_LDFLAGS` (README, BOTIFY.md); consumer builds
+  need nothing new.
+
 ### [v0.15.4] - 2026-10-09
 
 First release of the module `github.com/botify-labs/v8go`, replacing the Botify fork of

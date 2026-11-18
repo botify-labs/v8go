@@ -9,7 +9,7 @@ package v8go
 // when the link holds other strong ones (AddressSanitizer's for -tags
 // leakcheck, an allocator's): a PROVIDE alias can't override those, so
 // --wrap sends the references to __wrap_<name>, which
-// deps/linux_*/libv8go_cxxalias.a aliases to the renamed symbol.
+// deps/linux_*/v8go_cxxalias.ld aliases to the renamed symbol.
 
 // #cgo LDFLAGS: -Wl,--wrap=_ZdaPv -Wl,--wrap=_ZdaPvRKSt9nothrow_t -Wl,--wrap=_ZdaPvSt11align_val_t -Wl,--wrap=_ZdaPvSt11align_val_tRKSt9nothrow_t -Wl,--wrap=_ZdaPvm -Wl,--wrap=_ZdaPvmSt11align_val_t -Wl,--wrap=_ZdlPv -Wl,--wrap=_ZdlPvRKSt9nothrow_t -Wl,--wrap=_ZdlPvSt11align_val_t -Wl,--wrap=_ZdlPvSt11align_val_tRKSt9nothrow_t -Wl,--wrap=_ZdlPvm -Wl,--wrap=_ZdlPvmSt11align_val_t -Wl,--wrap=_Znam -Wl,--wrap=_ZnamRKSt9nothrow_t -Wl,--wrap=_ZnamSt11align_val_t -Wl,--wrap=_ZnamSt11align_val_tRKSt9nothrow_t -Wl,--wrap=_Znwm -Wl,--wrap=_ZnwmRKSt9nothrow_t -Wl,--wrap=_ZnwmSt11align_val_t -Wl,--wrap=_ZnwmSt11align_val_tRKSt9nothrow_t
 import "C"

@@ -95,16 +95,10 @@ for f in deps/*_*/cgo.go; do
   # shared library that nothing before it on the command line needs.
   sed -i '/^\/\/ #cgo linux,!v8go_source LDFLAGS: -lm$/d' "$f"
   sed -i '/^\/\/ #cgo LDFLAGS: .*-lv8-0 /a // #cgo linux,!v8go_source LDFLAGS: -lm' "$f"
-  # Source mode: the linker script that aliases the original names of V8's
-  # C++ runtime, renamed below (tools/gen_cxx_runtime_rename_map.sh). Before
-  # the archives, so that its EXTERNs load their members.
-  grep -q -- '-lv8go_cxxalias' "$f" ||
-    sed -i '/^\/\/ #cgo LDFLAGS: -L\${SRCDIR}$/a // #cgo linux,v8go_source LDFLAGS: -lv8go_cxxalias' "$f"
 done
 # The seds above match tommie's cgo.go lines: stop if one of them changed shape.
 for f in deps/*_*/cgo.go; do
-  for line in '// #cgo !v8go_source LDFLAGS: -lv8go' '// #cgo linux,!v8go_source LDFLAGS: -lm' \
-    '// #cgo linux,v8go_source LDFLAGS: -lv8go_cxxalias'; do
+  for line in '// #cgo !v8go_source LDFLAGS: -lv8go' '// #cgo linux,!v8go_source LDFLAGS: -lm'; do
     if ! grep -qxF -- "$line" "$f"; then
       echo "$f: missing '$line' (tommie's cgo.go changed shape): update tools/sync_tommie.sh" >&2
       exit 1
