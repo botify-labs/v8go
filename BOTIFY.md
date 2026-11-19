@@ -29,8 +29,9 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   long-lived ne plafonne que grâce au timer du memory reducer de V8 (≥ 8 s) : un soak
   (`bench/soak_test.go`) doit durer assez longtemps pour qu'il se déclenche. Le job `soak` de
   botify-ci le fait tourner 25 s (`SOAK_DURATION=25s`, une durée plutôt qu'un nombre d'itérations : 30 000
-  itérations ne duraient que 6,8 s sur un runner rapide, avant le timer) et vérifie une croissance
-  du RSS ≤ 5 % sur la seconde moitié et un nombre de goroutines stable. Sans `SOAK_DURATION`, le soak
+  itérations ne duraient que 6,8 s sur un runner rapide, avant le timer) et vérifie que la médiane
+  du RSS croît d'au plus 5 % du deuxième quart du run au dernier (les médianes ignorent les creux
+  d'un échantillon du memory reducer), et un nombre de goroutines stable. Sans `SOAK_DURATION`, le soak
   fait `SOAK_ITERATIONS` itérations (100 000 par défaut, ~20 s ; `bench/run.sh soak`).
 - **Allocator shim retiré** : les libs V8 de tommie embarquent l'*allocator shim* de PartitionAlloc,
   qui remplacerait `malloc`/`free`/`new`/`delete` pour tout le processus consommateur (+16 à +40 %
@@ -61,8 +62,11 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
 
   `tools/build_bridge.sh` renomme de même les bridges Linux, et la table et les deux
   scripts (`build_bridge.sh`, `rename_cxx_runtime.sh`) entrent dans `tools/bridge_hash.sh`. Mode source : les objets compilés par cgo référencent les noms d'origine ;
-  `deps/linux_*/libv8go_cxxalias.a` (un script d'édition de liens généré, lié avant les archives en
-  mode source seulement) les définit comme alias des noms renommés (`EXTERN` + `PROVIDE`), et
+  `deps/linux_*/v8go_cxxalias.ld` (un script d'édition de liens généré) les définit comme alias des
+  noms renommés (`EXTERN` + `PROVIDE`). Le mode source le passe par son chemin dans `CGO_LDFLAGS`
+  (`CGO_LDFLAGS=$PWD/deps/linux_$(go env GOARCH)/v8go_cxxalias.ld`), qui précède les archives : depuis
+  Go 1.26.11 et 1.27.4, `cmd/go` refuse un script d'édition de liens portant un nom de bibliothèque
+  (`lib*.a`) dans un répertoire `-L` d'une directive `#cgo`, même en mode consommateur. Et
   `botify_cxxalias_linux.go` redirige `operator new`/`delete` par `--wrap`, pour qu'ils restent ceux
   de V8 même à côté de ceux d'ASan (`-tags leakcheck`). Preuve : `internal/cxxprobe` (C++ g++ lié avec
   v8go, tag `cxxprobe`), exécuté en lien entièrement statique par le job `static-cxx-probe`.
@@ -76,7 +80,7 @@ renommé `github.com/botify-labs/v8go`. Les ajouts Botify sont listés dans `too
   - sous ASan (`-tags leakcheck`), `operator new`/`delete` de V8 et de v8go passent par ceux de
     libc++abi : la détection des `new`/`delete` non appariés (`alloc-dealloc-mismatch`) est perdue
     pour ce code. LeakSanitizer et les contrôles au niveau de `malloc` ne changent pas ;
-  - les alias (`libv8go_cxxalias.a`) ne sont testés qu'avec GNU ld (le défaut du pilote clang-21) ;
+  - les alias (`v8go_cxxalias.ld`) ne sont testés qu'avec GNU ld (le défaut du pilote clang-21) ;
     lld et gold ne le sont pas.
 - **Chemin JS→Go** (`bench/results/2026-10-07-callback/callback-perf.md`) :
   `botify_values.h` (valeurs suivies par un contexte : vecteur indexé au lieu de
@@ -201,7 +205,9 @@ affichés (ceux de `botify-ci.yml`) :
 
 ## Publier une version (ex. v0.15.4)
 
-Numérotation : `v0.<majeure de V8>.<mineure de V8>` (`v0.15.4` pour V8 15.4). Le module reste en
+Numérotation : `v0.<majeure de V8>.<mineure de V8>` (`v0.15.4` pour V8 15.4). Un correctif sans
+changement de V8 incrémente le dernier chiffre, qui dépasse alors la mineure de V8 (`v0.15.5`, encore
+V8 15.4 : voir `CHANGELOG.md`). Le module reste en
 v0 : une version majeure ≥ 2 imposerait le chemin `github.com/botify-labs/v8go/vN` (versionnage
 sémantique des imports de Go), donc un changement d'import chez chaque consommateur.
 

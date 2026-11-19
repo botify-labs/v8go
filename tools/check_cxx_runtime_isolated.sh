@@ -3,7 +3,7 @@
 # of deps/linux_* (V8, libc++, libc++abi, compiler-rt, the bridge) defines or
 # references a symbol of tools/cxx-runtime-rename.map under its original
 # name, and the map and the source-mode aliases
-# (deps/linux_*/libv8go_cxxalias.a, botify_cxxalias_linux.go) are the ones
+# (deps/linux_*/v8go_cxxalias.ld, botify_cxxalias_linux.go) are the ones
 # tools/gen_cxx_runtime_rename_map.sh derives from the archives (a new libc++
 # symbol is renamed too), and no archive holds a double suffix (X.v8cr.v8cr).
 # tools/sync_tommie.sh and tools/build_bridge.sh apply the map
@@ -27,7 +27,7 @@ bad=0
 gen=$(mktemp -d)
 trap 'rm -rf "$gen"' EXIT
 tools/gen_cxx_runtime_rename_map.sh "$gen"
-for f in "$MAP" deps/linux_*/libv8go_cxxalias.a botify_cxxalias_linux.go; do
+for f in "$MAP" deps/linux_*/v8go_cxxalias.ld botify_cxxalias_linux.go; do
   if ! diff -u "$f" "$gen/$f" >&2; then
     echo "$f is stale: run tools/gen_cxx_runtime_rename_map.sh, then tools/rename_cxx_runtime.sh" >&2
     bad=1

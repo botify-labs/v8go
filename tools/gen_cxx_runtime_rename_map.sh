@@ -2,7 +2,7 @@
 # Generates tools/cxx-runtime-rename.map, the symbols of V8's C++ runtime that
 # tools/rename_cxx_runtime.sh renames in the Linux archives, so that a
 # consumer binary can link libstdc++ next to v8go, even fully statically; and
-# deps/linux_*/libv8go_cxxalias.a and botify_cxxalias_linux.go, the linker
+# deps/linux_*/v8go_cxxalias.ld and botify_cxxalias_linux.go, the linker
 # script and the --wrap flags that resolve the
 # original names for source mode (-tags v8go_source).
 #
@@ -27,11 +27,11 @@
 #
 # Source mode compiles the v8go .cc files with cgo, so their objects reference
 # the original names, which the renamed archives no longer define. The
-# linker script, linked before the archives in source mode only
-# (deps/linux_*/cgo.go), defines each original name the link references as an
-# alias of the renamed one (PROVIDE), and EXTERN loads the archive members.
-# GNU ld and lld read a file that is neither an object nor an archive as a
-# linker script, also when -l finds it.
+# linker script defines each original name the link references as an alias
+# of the renamed one (PROVIDE), and EXTERN loads the archive members. Source
+# mode passes it by path in $CGO_LDFLAGS, which comes before the archives:
+# since Go 1.26.11 and 1.27.4, a #cgo -L directory must not hold a linker
+# script under a library name (cmd/go rejects it, consumer builds included).
 #
 # Deterministic: it reads the archives of every deps/linux_* directory and
 # maps a name already renamed back to its original, so it writes the same
@@ -40,7 +40,7 @@
 #
 # Usage: tools/gen_cxx_runtime_rename_map.sh [root]
 #   writes <root>/tools/cxx-runtime-rename.map and
-#   <root>/deps/linux_*/libv8go_cxxalias.a and <root>/botify_cxxalias_linux.go
+#   <root>/deps/linux_*/v8go_cxxalias.ld and <root>/botify_cxxalias_linux.go
 #   (default root: the repository).
 # Reads ELF archives with llvm-nm (llvm-nm-NN...), else $NM (default nm).
 set -euo pipefail
@@ -102,7 +102,7 @@ for d in "${dirs[@]}"; do
     awk -v s="$SUFFIX" '{print "EXTERN(\"" $1 s "\")"}' <<<"$names"
     awk -v s="$SUFFIX" '{print "PROVIDE(\"" $1 "\" = \"" $1 s "\");"}' <<<"$names"
     awk -v s="$SUFFIX" '{print "PROVIDE(\"__wrap_" $1 "\" = \"" $1 s "\");"}' <<<"$newdel"
-  } >"$ROOT/$d/libv8go_cxxalias.a"
+  } >"$ROOT/$d/v8go_cxxalias.ld"
 done
 
 {
@@ -117,7 +117,7 @@ done
   echo "// when the link holds other strong ones (AddressSanitizer's for -tags"
   echo "// leakcheck, an allocator's): a PROVIDE alias can't override those, so"
   echo "// --wrap sends the references to __wrap_<name>, which"
-  echo "// deps/linux_*/libv8go_cxxalias.a aliases to the renamed symbol."
+  echo "// deps/linux_*/v8go_cxxalias.ld aliases to the renamed symbol."
   echo
   echo "// #cgo LDFLAGS:$(awk '{printf " -Wl,--wrap=%s", $1}' <<<"$newdel")"
   echo 'import "C"'
