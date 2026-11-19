@@ -639,3 +639,104 @@ compiled.then(goFn);
 		t.Errorf("Go reactions ran %d times after Isolate.Cleanup", calls)
 	}
 }
+
+func TestRetainedUnboundScriptOutlivesCleanup(t *testing.T) {
+	t.Parallel()
+	iso := v8.NewIsolate()
+	defer iso.Dispose()
+
+	const src = "function add(a, b) { return a + b }; add(40, 2)"
+	us, err := iso.CompileUnboundScript(src, "kept.js", v8.CompileOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	us.Retain()
+	for i := 0; i < 5; i++ {
+		if _, err := iso.CompileUnboundScript(src, "dropped.js", v8.CompileOptions{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := iso.InternalUnboundScriptCount(); n != 6 {
+		t.Fatalf("expected 6 unbound scripts, got %d", n)
+	}
+
+	for i := 0; i < 3; i++ {
+		iso.Cleanup()
+		if n := iso.InternalUnboundScriptCount(); n != 1 {
+			t.Fatalf("expected the retained script alone after Cleanup, got %d", n)
+		}
+		ctx := v8.NewContext(iso)
+		v, err := us.Run(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v.Int32() != 42 {
+			t.Fatalf("expected 42, got %v", v)
+		}
+		ctx.Cleanup()
+		ctx.Close()
+	}
+
+	us.Release()
+	if n := iso.InternalUnboundScriptCount(); n != 0 {
+		t.Fatalf("expected 0 unbound scripts after Release, got %d", n)
+	}
+	us.Release() // a second Release does nothing
+}
+
+func TestReleaseOfScriptNotRetainedDoesNothing(t *testing.T) {
+	t.Parallel()
+	iso := v8.NewIsolate()
+	defer iso.Dispose()
+	ctx := v8.NewContext(iso)
+	defer ctx.Close()
+
+	us, err := iso.CompileUnboundScript("1 + 1", "plain.js", v8.CompileOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	us.Release()
+	if n := iso.InternalUnboundScriptCount(); n != 1 {
+		t.Fatalf("expected the script to stay until Cleanup, got %d", n)
+	}
+	v, err := us.Run(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Int32() != 2 {
+		t.Fatalf("expected 2, got %v", v)
+	}
+	iso.Cleanup()
+	if n := iso.InternalUnboundScriptCount(); n != 0 {
+		t.Fatalf("expected 0 unbound scripts after Cleanup, got %d", n)
+	}
+}
+
+// Dispose frees the retained scripts; a script allocated afterwards, maybe at
+// the same address, is freed by Cleanup as any other.
+func TestDisposeFreesRetainedUnboundScripts(t *testing.T) {
+	t.Parallel()
+	for round := 0; round < 20; round++ {
+		iso := v8.NewIsolate()
+		for i := 0; i < 5; i++ {
+			us, err := iso.CompileUnboundScript("1", "kept.js", v8.CompileOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			us.Retain()
+		}
+		iso.Dispose()
+
+		iso = v8.NewIsolate()
+		for i := 0; i < 20; i++ {
+			if _, err := iso.CompileUnboundScript("2", "new.js", v8.CompileOptions{}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		iso.Cleanup()
+		if n := iso.InternalUnboundScriptCount(); n != 0 {
+			t.Fatalf("round %d: expected 0 unbound scripts after Cleanup, got %d", round, n)
+		}
+		iso.Dispose()
+	}
+}

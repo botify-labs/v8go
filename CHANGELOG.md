@@ -16,6 +16,11 @@ lists every change in detail.
 
 ### [Unreleased]
 
+#### Added
+- `UnboundScript.Retain` and `UnboundScript.Release`: a script compiled by
+  `Isolate.CompileUnboundScript` and retained stays past `Isolate.Cleanup`, until `Release` or the
+  isolate's `Dispose`, so that it runs again in the next contexts without being compiled again.
+
 #### Changed
 - Requires Go 1.27.4 or newer (`go 1.27.4` in `go.mod`, was `go 1.19`).
 
